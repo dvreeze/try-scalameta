@@ -51,11 +51,11 @@ object ShowSourceContents {
     // TODO Traits
 
     val classes = source.findAllTopmost[Defn.Class]()
-      .filter(_.findAncestor[Defn.Class]().isEmpty)
-      .filter(_.findAncestor[Defn.Object]().isEmpty)
+      .filter(_.findFirstAncestor[Defn.Class]().isEmpty)
+      .filter(_.findFirstAncestor[Defn.Object]().isEmpty)
     val objects = source.findAllTopmost[Defn.Object]()
-      .filter(_.findAncestor[Defn.Class]().isEmpty)
-      .filter(_.findAncestor[Defn.Object]().isEmpty)
+      .filter(_.findFirstAncestor[Defn.Class]().isEmpty)
+      .filter(_.findFirstAncestor[Defn.Object]().isEmpty)
 
     classes.foreach(printClassContents)
     objects.foreach(printObjectContents)
@@ -63,9 +63,9 @@ object ShowSourceContents {
 
   private def printClassContents(cls: Defn.Class): Unit = {
     val publicMethods: List[Defn.Def] = cls.findTopmost[Defn.Def](f => isPublic(f.mods))
-      .filter(_.findAncestor[Stat]().exists(_.structure == cls.structure))
+      .filter(_.findFirstAncestor[Stat]().exists(_.structure == cls.structure))
     val publicVals: List[Defn.Val] = cls.findTopmost[Defn.Val](v => isPublic(v.mods))
-      .filter(_.findAncestor[Stat]().exists(_.structure == cls.structure))
+      .filter(_.findFirstAncestor[Stat]().exists(_.structure == cls.structure))
 
     println(s"Class: ${cls.name}")
 
@@ -75,9 +75,9 @@ object ShowSourceContents {
 
   private def printObjectContents(obj: Defn.Object): Unit = {
     val publicMethods: List[Defn.Def] = obj.findTopmost[Defn.Def](f => isPublic(f.mods))
-      .filter(_.findAncestor[Stat]().exists(_.structure == obj.structure))
+      .filter(_.findFirstAncestor[Stat]().exists(_.structure == obj.structure))
     val publicVals: List[Defn.Val] = obj.findTopmost[Defn.Val](v => isPublic(v.mods))
-      .filter(_.findAncestor[Stat]().exists(_.structure == obj.structure))
+      .filter(_.findFirstAncestor[Stat]().exists(_.structure == obj.structure))
 
     println(s"Object: ${obj.name}")
 

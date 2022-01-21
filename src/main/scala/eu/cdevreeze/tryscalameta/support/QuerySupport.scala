@@ -35,6 +35,10 @@ object QuerySupport {
       tree.children.collect { case t: A if p(t) => t }
     }
 
+    def findFirstChild[A <: Tree : ClassTag](p: A => Boolean): Option[A] = filterChildren[A](p).headOption
+
+    def findFirstChild[A <: Tree : ClassTag](): Option[A] = filterChildren[A](_ => true).headOption
+
     // Descendant-or-self axis
 
     def filterDescendantsOrSelf[A <: Tree : ClassTag](p: A => Boolean): List[A] = {
@@ -45,6 +49,10 @@ object QuerySupport {
 
     def findAllDescendantsOrSelf[A <: Tree : ClassTag](): List[A] = filterDescendantsOrSelf[A](_ => true)
 
+    def findFirstDescendantOrSelf[A <: Tree : ClassTag](p: A => Boolean): Option[A] = filterDescendantsOrSelf[A](p).headOption
+
+    def findFirstDescendantOrSelf[A <: Tree : ClassTag](): Option[A] = findAllDescendantsOrSelf[A]().headOption
+
     // Descendant axis
 
     def filterDescendants[A <: Tree : ClassTag](p: A => Boolean): List[A] = {
@@ -52,6 +60,10 @@ object QuerySupport {
     }
 
     def findAllDescendants[A <: Tree : ClassTag](): List[A] = filterDescendants[A](_ => true)
+
+    def findFirstDescendant[A <: Tree : ClassTag](p: A => Boolean): Option[A] = filterDescendants[A](p).headOption
+
+    def findFirstDescendant[A <: Tree : ClassTag](): Option[A] = findAllDescendants[A]().headOption
 
     // Like descendant-or-self axis, but only topmost
 
@@ -86,6 +98,10 @@ object QuerySupport {
 
     def findAllAncestorsOrSelf[A <: Tree : ClassTag](): List[A] = filterAncestorsOrSelf[A](_ => true)
 
+    def findFirstAncestorOrSelf[A <: Tree : ClassTag](p: A => Boolean): Option[A] = filterAncestorsOrSelf[A](p).headOption
+
+    def findFirstAncestorOrSelf[A <: Tree : ClassTag](): Option[A] = findAllAncestorsOrSelf[A]().headOption
+
     // Ancestor axis
 
     def filterAncestors[A <: Tree : ClassTag](p: A => Boolean): List[A] = {
@@ -94,8 +110,8 @@ object QuerySupport {
 
     def findAllAncestors[A <: Tree : ClassTag](): List[A] = filterAncestors[A](_ => true)
 
-    def findAncestor[A <: Tree : ClassTag](p: A => Boolean): Option[A] = filterAncestors[A](p).headOption
+    def findFirstAncestor[A <: Tree : ClassTag](p: A => Boolean): Option[A] = filterAncestors[A](p).headOption
 
-    def findAncestor[A <: Tree : ClassTag](): Option[A] = findAllAncestors[A]().headOption
+    def findFirstAncestor[A <: Tree : ClassTag](): Option[A] = findAllAncestors[A]().headOption
   }
 }
