@@ -21,68 +21,174 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 
+import scala.meta.Decl
 import scala.meta.Defn
 import scala.meta.Mod
 import scala.meta.Source
 import scala.meta.Stat
+import scala.meta.XtensionQuasiquoteTerm
+import scala.meta.XtensionQuasiquoteType
+import scala.meta.contrib._
 import scala.meta.inputs.Input
-import scala.util.chaining._
 
 import eu.cdevreeze.tryscalameta.support.QuerySupport._
 import eu.cdevreeze.tryscalameta.support.VirtualFileSupport._
 
 /**
- * Prints a somewhat javap-like output about a given source file to the console.
+ * Prints a somewhat javap-like output about a given source file to the console, ignoring non-public content.
  *
  * @author
  *   Chris de Vreeze
  */
 object ShowSourceContents {
 
+  private val deltaIndent = "  "
+
   def main(args: Array[String]): Unit = {
-    require(args.sizeIs == 1, s"Missing source file path")
+    require(args.sizeIs == 1, s"Missing source file or (root) directory path")
 
     val sourcePath: Path = Paths.get(new File(args(0)).toURI)
-      .pipe(f => f.ensuring(Files.isRegularFile(f), "Not a normal file"))
 
-    val sourceFile: Input.VirtualFile = makeVirtualFile(sourcePath)
-    val source: Source = sourceFile.parse[Source].get
+    val sources: Seq[(Path, Source)] =
+      if (Files.isRegularFile(sourcePath)) {
+        val sourceFile: Input.VirtualFile = makeVirtualFile(sourcePath)
+        val source: Source = sourceFile.parse[Source].get
+        Seq(sourcePath -> source)
+      } else {
+        if (Files.isDirectory(sourcePath)) {
+          findAllScalaSourceFiles(sourcePath).map(f => new File(f.path).toPath -> f.parse[Source].get)
+        } else {
+          Seq.empty
+        }
+      }
 
-    // TODO Traits
-
-    val classes = source.findAllTopmost[Defn.Class]()
-      .filter(_.findFirstAncestor[Defn.Class]().isEmpty)
-      .filter(_.findFirstAncestor[Defn.Object]().isEmpty)
-    val objects = source.findAllTopmost[Defn.Object]()
-      .filter(_.findFirstAncestor[Defn.Class]().isEmpty)
-      .filter(_.findFirstAncestor[Defn.Object]().isEmpty)
-
-    classes.foreach(printClassContents)
-    objects.foreach(printObjectContents)
+    printSources(sources)
   }
 
-  private def printClassContents(cls: Defn.Class): Unit = {
-    val publicMethods: List[Defn.Def] = cls.findTopmost[Defn.Def](f => isPublic(f.mods))
-      .filter(_.findFirstAncestor[Stat]().exists(_.structure == cls.structure))
-    val publicVals: List[Defn.Val] = cls.findTopmost[Defn.Val](v => isPublic(v.mods))
-      .filter(_.findFirstAncestor[Stat]().exists(_.structure == cls.structure))
-
-    println(s"Class: ${cls.name}")
-
-    publicMethods.foreach(m => println(s"\tPublic method: ${m.name}"))
-    publicVals.foreach(v => println(s"\tPublic val: ${v.pats}"))
+  def printSources(sources: Seq[(Path, Source)]): Unit = {
+    sources.foreach { case (path, src) =>
+      println()
+      println(s"Source (in ${path.getFileName}):")
+      println()
+      printSource(src)
+    }
   }
 
-  private def printObjectContents(obj: Defn.Object): Unit = {
-    val publicMethods: List[Defn.Def] = obj.findTopmost[Defn.Def](f => isPublic(f.mods))
-      .filter(_.findFirstAncestor[Stat]().exists(_.structure == obj.structure))
-    val publicVals: List[Defn.Val] = obj.findTopmost[Defn.Val](v => isPublic(v.mods))
-      .filter(_.findFirstAncestor[Stat]().exists(_.structure == obj.structure))
+  def printSource(source: Source): Unit = {
+    val newIndent = deltaIndent
 
-    println(s"Object: ${obj.name}")
+    // Note that a statement is either a definition, declaration, term or import. Here the latter two are ignored.
+    // Note that we must also go inside packages (which are statements themselves), and not stop there.
+    source.stats.flatMap(_.findTopmostOrSelf[Stat](isDefnOrDecl)).foreach {
+      case defn: Defn => printDefn(defn, newIndent)
+      case decl: Decl => printDecl(decl, newIndent)
+      case _          => ()
+    }
+  }
 
-    publicMethods.foreach(m => println(s"\tPublic method: ${m.name}"))
-    publicVals.foreach(v => println(s"\tPublic val: ${v.pats}"))
+  private def printDefn(defn: Defn, indent: String): Unit = {
+    defn match {
+      case defn: Defn.Trait if isPublic(defn.mods)  => printTraitDefn(defn, indent)
+      case defn: Defn.Class if isPublic(defn.mods)  => printClassDefn(defn, indent)
+      case defn: Defn.Object if isPublic(defn.mods) => printObjectDefn(defn, indent)
+      case defn: Defn.Def if isPublic(defn.mods)    => printDefDefn(defn, indent)
+      case defn: Defn.Val if isPublic(defn.mods)    => printValDefn(defn, indent)
+      case defn: Defn.Var if isPublic(defn.mods)    => printVarDefn(defn, indent)
+      case defn: Defn.Type if isPublic(defn.mods)   => printTypeDefn(defn, indent)
+      case _                                        => ()
+    }
+  }
+
+  private def printDecl(decl: Decl, indent: String): Unit = {
+    decl match {
+      case decl: Decl.Def if isPublic(decl.mods)  => printDefDecl(decl, indent)
+      case decl: Decl.Val if isPublic(decl.mods)  => printValDecl(decl, indent)
+      case decl: Decl.Var if isPublic(decl.mods)  => printVarDecl(decl, indent)
+      case decl: Decl.Type if isPublic(decl.mods) => printTypeDecl(decl, indent)
+      case _                                      => ()
+    }
+  }
+
+  private def printTraitDefn(defn: Defn.Trait, indent: String): Unit = {
+    val newIndent = indent + deltaIndent
+
+    assert(defn.templ.stats.forall(_.findFirstAncestor[Stat]().exists(_.isEqual(defn))))
+
+    println(indent + defn.copy(templ = defn.templ.copy(stats = Nil)).syntax + ":")
+
+    defn.templ.findTopmost[Stat](isDefnOrDecl).foreach {
+      case defn: Defn => printDefn(defn, newIndent)
+      case decl: Decl => printDecl(decl, newIndent)
+      case _          => ()
+    }
+  }
+
+  private def printClassDefn(defn: Defn.Class, indent: String): Unit = {
+    val newIndent = indent + deltaIndent
+
+    assert(defn.templ.stats.forall(_.findFirstAncestor[Stat]().exists(_.isEqual(defn))))
+
+    println(indent + defn.copy(templ = defn.templ.copy(stats = Nil)).syntax + ":")
+
+    defn.templ.findTopmost[Stat](isDefnOrDecl).foreach {
+      case defn: Defn => printDefn(defn, newIndent)
+      case decl: Decl => printDecl(decl, newIndent)
+      case _          => ()
+    }
+  }
+
+  private def printObjectDefn(defn: Defn.Object, indent: String): Unit = {
+    val newIndent = indent + deltaIndent
+
+    assert(defn.templ.stats.forall(_.findFirstAncestor[Stat]().exists(_.isEqual(defn))))
+
+    println(indent + defn.copy(templ = defn.templ.copy(stats = Nil)).syntax + ":")
+
+    defn.templ.findTopmost[Stat](isDefnOrDecl).foreach {
+      case defn: Defn => printDefn(defn, newIndent)
+      case decl: Decl => printDecl(decl, newIndent)
+      case _          => ()
+    }
+  }
+
+  private def printDefDefn(defn: Defn.Def, indent: String): Unit = {
+    println(indent + defn.copy(body = q"body_placeholder").syntax)
+  }
+
+  private def printValDefn(defn: Defn.Val, indent: String): Unit = {
+    println(indent + defn.copy(rhs = q"rhs_placeholder").syntax)
+  }
+
+  private def printVarDefn(defn: Defn.Var, indent: String): Unit = {
+    println(indent + defn.copy(rhs = Some(q"rhs_placeholder")).syntax)
+  }
+
+  private def printTypeDefn(defn: Defn.Type, indent: String): Unit = {
+    println(indent + defn.copy(body = t"body_placeholder").syntax)
+  }
+
+  private def printTypeDecl(decl: Decl.Type, indent: String): Unit = {
+    println(indent + decl.syntax)
+  }
+
+  private def printDefDecl(decl: Decl.Def, indent: String): Unit = {
+    println(indent + decl.syntax)
+  }
+
+  private def printValDecl(decl: Decl.Val, indent: String): Unit = {
+    println(indent + decl.syntax)
+  }
+
+  private def printVarDecl(decl: Decl.Var, indent: String): Unit = {
+    println(indent + decl.syntax)
+  }
+
+  private def isDefnOrDecl(stat: Stat): Boolean = {
+    stat match {
+      case _: Defn => true
+      case _: Decl => true
+      case _       => false
+    }
   }
 
   private def isPublic(mods: List[Mod]): Boolean = {

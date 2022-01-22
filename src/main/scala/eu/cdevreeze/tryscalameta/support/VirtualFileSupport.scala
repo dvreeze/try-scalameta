@@ -16,13 +16,14 @@
 
 package eu.cdevreeze.tryscalameta.support
 
-import java.io.File
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 
+import scala.jdk.StreamConverters._
 import scala.meta.inputs.Input
 import scala.util.Try
+import scala.util.Using
 
 /**
  * Virtual file support.
@@ -32,7 +33,7 @@ import scala.util.Try
  */
 object VirtualFileSupport {
 
-  private val utf8 = StandardCharsets.UTF_8.toString
+  private val utf8 = StandardCharsets.UTF_8
 
   def makeVirtualFile(path: Path): Input.VirtualFile = {
     require(Files.isRegularFile(path), s"Not a regular file: $path")
@@ -44,25 +45,16 @@ object VirtualFileSupport {
   def findAllSourceFiles(dir: Path, isSource: Path => Boolean): Seq[Input.VirtualFile] = {
     require(dir.toFile.isDirectory, s"Not a directory: $dir")
 
-    findAllNormalFiles(dir.toFile).map(_.toPath).filter(isSource).map(makeVirtualFile)
+    findAllNormalFiles(dir).filter(isSource).map(makeVirtualFile)
   }
 
   def findAllScalaSourceFiles(dir: Path): Seq[Input.VirtualFile] = {
     findAllSourceFiles(dir, f => Try(f.getFileName.toString).getOrElse("").endsWith(".scala"))
   }
 
-  // TODO Use nio.file.Files instead
-  private def findAllNormalFiles(dir: File): Seq[File] = {
-    require(dir.isDirectory, s"Not a directory: $dir")
-
-    dir.listFiles().toSeq.flatMap {
-      case d: File if d.isDirectory =>
-        // Recursive call
-        findAllNormalFiles(d)
-      case f: File if f.isFile =>
-        Seq(f)
-      case _: File =>
-        Seq.empty
-    }
+  private def findAllNormalFiles(dir: Path): Seq[Path] = {
+    require(Files.isDirectory(dir), s"Not a directory: $dir")
+    // Does not follow symbolic links
+    Using.resource(Files.walk(dir)) { _.toScala(Seq).filter(f => Files.isRegularFile(f)) }
   }
 }

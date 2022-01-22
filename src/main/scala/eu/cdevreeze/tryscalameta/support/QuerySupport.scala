@@ -22,12 +22,88 @@ import scala.reflect.ClassTag
 /**
  * Tree query support reminding somewhat of XPath axes. This API is not geared towards pattern matching, though.
  *
+ * The query API is intentionally far less minimal and less powerful than the Scalameta built-in method "collect",
+ * but it gives a more XPath-like development experience to those using it. In that sense it may make many custom
+ * traversals obsolete (where method "collect" does not cut it), while offering clear semantics and preventing
+ * somewhat involved output collection creation (of custom traversals).
+ *
+ * This query API is somewhat overlapping with contrib.TreeOps.
+ *
  * @author
  *   Chris de Vreeze
  */
 object QuerySupport {
 
-  implicit class WithQueryMethods(val tree: Tree) extends AnyVal {
+  trait QueryApi {
+
+    // Child axis
+
+    def filterChildren[A <: Tree : ClassTag](p: A => Boolean): List[A]
+
+    def findFirstChild[A <: Tree : ClassTag](p: A => Boolean): Option[A]
+
+    def findFirstChild[A <: Tree : ClassTag](): Option[A]
+
+    // Descendant-or-self axis
+
+    def filterDescendantsOrSelf[A <: Tree : ClassTag](p: A => Boolean): List[A]
+
+    def findAllDescendantsOrSelf[A <: Tree : ClassTag](): List[A]
+
+    def findFirstDescendantOrSelf[A <: Tree : ClassTag](p: A => Boolean): Option[A]
+
+    def findFirstDescendantOrSelf[A <: Tree : ClassTag](): Option[A]
+
+    // Descendant axis
+
+    def filterDescendants[A <: Tree : ClassTag](p: A => Boolean): List[A]
+
+    /**
+     * Equivalent to `TreeOps.descendants(this).collect { case t: A => t }`
+     */
+    def findAllDescendants[A <: Tree : ClassTag](): List[A]
+
+    def findFirstDescendant[A <: Tree : ClassTag](p: A => Boolean): Option[A]
+
+    def findFirstDescendant[A <: Tree : ClassTag](): Option[A]
+
+    // Like descendant-or-self axis, but only topmost
+
+    def findTopmostOrSelf[A <: Tree : ClassTag](p: A => Boolean): List[A]
+
+    def findAllTopmostOrSelf[A <: Tree : ClassTag](): List[A]
+
+    // Like descendant axis, but only topmost
+
+    def findTopmost[A <: Tree : ClassTag](p: A => Boolean): List[A]
+
+    def findAllTopmost[A <: Tree : ClassTag](): List[A]
+
+    // Ancestor-or-self axis
+
+    def filterAncestorsOrSelf[A <: Tree : ClassTag](p: A => Boolean): List[A]
+
+    def findAllAncestorsOrSelf[A <: Tree : ClassTag](): List[A]
+
+    def findFirstAncestorOrSelf[A <: Tree : ClassTag](p: A => Boolean): Option[A]
+
+    def findFirstAncestorOrSelf[A <: Tree : ClassTag](): Option[A]
+
+    // Ancestor axis
+
+    def filterAncestors[A <: Tree : ClassTag](p: A => Boolean): List[A]
+
+    /**
+     * Equivalent to `TreeOps.ancestors(this).collect { case t: A => t }`
+     */
+    def findAllAncestors[A <: Tree : ClassTag](): List[A]
+
+    def findFirstAncestor[A <: Tree : ClassTag](p: A => Boolean): Option[A]
+
+    def findFirstAncestor[A <: Tree : ClassTag](): Option[A]
+  }
+
+  implicit class WithQueryMethods(val tree: Tree) extends QueryApi {
 
     // Child axis
 

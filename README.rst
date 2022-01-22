@@ -2,6 +2,8 @@
 Try-Scalameta
 =============
 
+TODO Adapt!
+
 This project is about getting to know `Scalameta`_ better. It also offers some utility methods which
 can be useful when using Scalameta in (Ammonite) REPL sessions to analyse Scala source code trees.
 
