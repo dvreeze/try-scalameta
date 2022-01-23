@@ -6,6 +6,8 @@ ThisBuild / description  := "Trying out Scalameta"
 ThisBuild / organization := "eu.cdevreeze.tryscalameta"
 ThisBuild / version      := "0.1.0"
 
+ThisBuild / versionScheme := Some("strict")
+
 ThisBuild / scalaVersion       := scalaVer
 ThisBuild / crossScalaVersions := crossScalaVer
 
