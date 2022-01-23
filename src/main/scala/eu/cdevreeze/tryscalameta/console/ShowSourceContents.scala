@@ -24,6 +24,8 @@ import java.nio.file.Paths
 import scala.meta.Decl
 import scala.meta.Defn
 import scala.meta.Mod
+import scala.meta.Name
+import scala.meta.Self
 import scala.meta.Source
 import scala.meta.Stat
 import scala.meta.XtensionQuasiquoteTerm
@@ -43,6 +45,7 @@ import eu.cdevreeze.tryscalameta.support.VirtualFileSupport._
 object ShowSourceContents {
 
   private val deltaIndent = "  "
+  private val emptySelf: Self = Self(Name(""), None)
 
   def main(args: Array[String]): Unit = {
     require(args.sizeIs == 1, s"Missing source file or (root) directory path")
@@ -66,11 +69,12 @@ object ShowSourceContents {
   }
 
   def printSources(sources: Seq[(Path, Source)]): Unit = {
-    sources.foreach { case (path, src) =>
-      println()
-      println(s"Source (in ${path.getFileName}):")
-      println()
-      printSource(src)
+    sources.foreach {
+      case (path, src) =>
+        println()
+        println(s"Source (in ${path.getFileName}):")
+        println()
+        printSource(src)
     }
   }
 
@@ -114,7 +118,7 @@ object ShowSourceContents {
 
     assert(defn.templ.stats.forall(_.findFirstAncestor[Stat]().exists(_.isEqual(defn))))
 
-    println(indent + defn.copy(templ = defn.templ.copy(stats = Nil)).syntax + ":")
+    println(indent + defn.copy(templ = defn.templ.copy(stats = Nil, self = emptySelf)).syntax + ":")
 
     defn.templ.findTopmost[Stat](isDefnOrDecl).foreach {
       case defn: Defn => printDefn(defn, newIndent)
@@ -128,7 +132,7 @@ object ShowSourceContents {
 
     assert(defn.templ.stats.forall(_.findFirstAncestor[Stat]().exists(_.isEqual(defn))))
 
-    println(indent + defn.copy(templ = defn.templ.copy(stats = Nil)).syntax + ":")
+    println(indent + defn.copy(templ = defn.templ.copy(stats = Nil, self = emptySelf)).syntax + ":")
 
     defn.templ.findTopmost[Stat](isDefnOrDecl).foreach {
       case defn: Defn => printDefn(defn, newIndent)
@@ -142,7 +146,7 @@ object ShowSourceContents {
 
     assert(defn.templ.stats.forall(_.findFirstAncestor[Stat]().exists(_.isEqual(defn))))
 
-    println(indent + defn.copy(templ = defn.templ.copy(stats = Nil)).syntax + ":")
+    println(indent + defn.copy(templ = defn.templ.copy(stats = Nil, self = emptySelf)).syntax + ":")
 
     defn.templ.findTopmost[Stat](isDefnOrDecl).foreach {
       case defn: Defn => printDefn(defn, newIndent)
@@ -183,15 +187,10 @@ object ShowSourceContents {
     println(indent + decl.syntax)
   }
 
-  private def isDefnOrDecl(stat: Stat): Boolean = {
-    stat match {
-      case _: Defn => true
-      case _: Decl => true
-      case _       => false
-    }
+  private def isDefnOrDecl(stat: Stat): Boolean = stat match {
+    case _: Defn | _: Decl => true
+    case _                 => false
   }
 
-  private def isPublic(mods: List[Mod]): Boolean = {
-    !mods.exists(_.isAccessMod)
-  }
+  private def isPublic(mods: List[Mod]): Boolean = !mods.exists(_.isAccessMod)
 }
