@@ -4,7 +4,7 @@ val crossScalaVer = Seq(scalaVer)
 
 ThisBuild / description  := "Trying out Scalameta"
 ThisBuild / organization := "eu.cdevreeze.tryscalameta"
-ThisBuild / version      := "0.1.0-SNAPSHOT"
+ThisBuild / version      := "0.1.0"
 
 ThisBuild / scalaVersion       := scalaVer
 ThisBuild / crossScalaVersions := crossScalaVer
