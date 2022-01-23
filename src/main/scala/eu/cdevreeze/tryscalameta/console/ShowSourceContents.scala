@@ -31,14 +31,13 @@ import scala.meta.Stat
 import scala.meta.XtensionQuasiquoteTerm
 import scala.meta.XtensionQuasiquoteType
 import scala.meta.contrib._
-import scala.meta.inputs.Input
 
 import eu.cdevreeze.tryscalameta.support.QuerySupport._
 import eu.cdevreeze.tryscalameta.support.VirtualFileSupport._
 
 /**
- * Prints a somewhat javap-like output (using Scala-like syntax) about a given source file to the console,
- * ignoring non-public content.
+ * Prints a somewhat javap-like output (using Scala-like syntax) about one or more given directories of source files
+ * to the console, ignoring non-public content.
  *
  * @author
  *   Chris de Vreeze
@@ -48,34 +47,38 @@ object ShowSourceContents {
   private val deltaIndent = "  "
   private val emptySelf: Self = Self(Name(""), None)
 
+  private final case class SourceWithPath(source: Source, absolutePath: Path, sourceRootDir: Path) {
+    require(Files.isDirectory(sourceRootDir), s"Not a directory: '$sourceRootDir")
+    require(Files.isRegularFile(absolutePath), s"Not a regular file: '$absolutePath")
+    require(absolutePath.startsWith(sourceRootDir), s"Path '$absolutePath' does not start with '$sourceRootDir'")
+
+    def relativePath: Path = sourceRootDir.relativize(absolutePath)
+  }
+
   def main(args: Array[String]): Unit = {
-    require(args.lengthIs == 1, s"Missing source file or (root) directory path. Usage: ShowSourceContents <path>")
+    require(args.lengthIs >= 1, s"Missing source root directories. Usage: ShowSourceContents <source root dir> ...")
 
-    val sourcePath: Path = Paths.get(new File(args(0)).toURI)
+    val sourceDirs: Seq[Path] = args.map(arg => Paths.get(new File(arg).toURI))
+    require(sourceDirs.forall(dir => Files.isDirectory(dir)), s"Not all passed paths are (source) directory paths")
 
-    val sources: Seq[(Path, Source)] =
-      if (Files.isRegularFile(sourcePath)) {
-        val sourceFile: Input.VirtualFile = makeVirtualFile(sourcePath)
-        val source: Source = sourceFile.parse[Source].get
-        Seq(sourcePath -> source)
-      } else {
-        if (Files.isDirectory(sourcePath)) {
-          findAllScalaSourceFiles(sourcePath).map(f => new File(f.path).toPath -> f.parse[Source].get)
-        } else {
-          Seq.empty
+    val sources: Seq[SourceWithPath] = {
+      sourceDirs.flatMap { sourceDir =>
+        findAllScalaSourceFiles(sourceDir).map { f =>
+          val source: Source = f.parse[Source].get
+          SourceWithPath(source, new File(f.path).toPath, sourceDir)
         }
       }
+    }
 
     printSources(sources)
   }
 
-  def printSources(sources: Seq[(Path, Source)]): Unit = {
-    sources.foreach {
-      case (path, src) =>
-        println()
-        println(s"Source (in ${path.getFileName}):")
-        println()
-        printSource(src)
+  def printSources(sources: Seq[SourceWithPath]): Unit = {
+    sources.foreach { sourceWithPath =>
+      println()
+      println(s"Source (in ${sourceWithPath.relativePath}):")
+      println()
+      printSource(sourceWithPath.source)
     }
   }
 
