@@ -25,7 +25,14 @@ ThisBuild / publishTo := {
 ThisBuild / pomExtra := pomData
 ThisBuild / pomIncludeRepository := { _ => false }
 
+// Artifact org.scalameta::scalameta depends on artifact org.scalameta::trees and on the Scala compiler. This makes
+// sense, because org.scalameta::scalameta ships with Metacp, which uses the Scala compiler to generate SemanticDB
+// output (e.g. symbols and types). Artifact org.scalameta::trees, on the other hand, needs no Scala compiler,
+// does not depend on it, and uses its internal FastParse parser combinator to parse Scala sources into syntactic trees (ASTs).
+
 ThisBuild / libraryDependencies += "org.scalameta" %% "scalameta" % "4.4.33"
+
+ThisBuild / libraryDependencies += "com.typesafe" % "config" % "1.4.1"
 
 ThisBuild / libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.10" % Test
 

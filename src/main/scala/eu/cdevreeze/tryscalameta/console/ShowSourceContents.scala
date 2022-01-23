@@ -37,7 +37,8 @@ import eu.cdevreeze.tryscalameta.support.QuerySupport._
 import eu.cdevreeze.tryscalameta.support.VirtualFileSupport._
 
 /**
- * Prints a somewhat javap-like output about a given source file to the console, ignoring non-public content.
+ * Prints a somewhat javap-like output (using Scala-like syntax) about a given source file to the console,
+ * ignoring non-public content.
  *
  * @author
  *   Chris de Vreeze

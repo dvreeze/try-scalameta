@@ -2,25 +2,164 @@
 Try-Scalameta
 =============
 
-TODO Adapt!
+This project is about getting to know `Scalameta`_ better, both the syntactic `Tree API`_
+and the `Semantic model`_.
 
-This project is about getting to know `Scalameta`_ better. It also offers some utility methods which
-can be useful when using Scalameta in (Ammonite) REPL sessions to analyse Scala source code trees.
+Syntactic Tree API
+==================
 
-In no way is it suggested that this is optimal use of Scalameta. It is quite likely that higher-level APIs
-that use Scalameta under the hood would be more appropriate than what is explored here. Even Scalameta
-itself has probably far much more to offer than what is used here. On the other hand, it is still good
-to explore the basics of Scalameta (its Tree API), and that's what is being done here.
+The syntactic tree model is the AST (abstract syntax tree) of parsed Scala code, without any
+semantic information such as symbols and types. See `Tree Guide`_ and `Tree API documentation`_.
+This syntactic model does show the syntactic structure of a Scala program, but it lacks the
+(semantic) data to navigate from function calls to function definitions, for example.
 
-Important documentation pages to get started are the `Tree Guide`_ and the corresponding `Tree API documentation`_.
+The syntactic model is created from Scala code without needing the Scala compiler for that.
+Instead, the Tree API ships with its own version of `FastParse`_. Indeed, when using `Coursier`_
+to show the dependencies of the scalameta Tree API, we get::
 
-Although `quasiquotes`_ are very powerful and useful, they are not really used in the examples in this project.
+    cs resolve org.scalameta:trees_2.13:4.4.33 -t
 
-It is hoped that this project can help in quickly scripting some Scala code analysis, using Ammonite REPL sessions.
-Some of the code in this project could first be copied into those REPL sessions.
+      Result:
+    └─ org.scalameta:trees_2.13:4.4.33
+       ├─ org.scala-lang:scala-library:2.13.8
+       ├─ org.scalameta:common_2.13:4.4.33
+       │  ├─ com.lihaoyi:sourcecode_2.13:0.2.7
+       │  ├─ com.thesamet.scalapb:scalapb-runtime_2.13:0.11.4
+       │  │  ├─ com.google.protobuf:protobuf-java:3.15.8
+       │  │  ├─ com.thesamet.scalapb:lenses_2.13:0.11.4
+       │  │  │  ├─ org.scala-lang:scala-library:2.13.6 -> 2.13.8
+       │  │  │  └─ org.scala-lang.modules:scala-collection-compat_2.13:2.4.4
+       │  │  │     └─ org.scala-lang:scala-library:2.13.5 -> 2.13.8
+       │  │  ├─ org.scala-lang:scala-library:2.13.6 -> 2.13.8
+       │  │  └─ org.scala-lang.modules:scala-collection-compat_2.13:2.4.4
+       │  │     └─ org.scala-lang:scala-library:2.13.5 -> 2.13.8
+       │  └─ org.scala-lang:scala-library:2.13.8
+       └─ org.scalameta:fastparse-v2_2.13:2.3.1
+          ├─ com.lihaoyi:geny_2.13:0.6.5
+          └─ com.lihaoyi:sourcecode_2.13:0.2.3 -> 0.2.7
+
+Program *ShowSourceContents* explores the Tree API (as documented in the `Tree API documentation`_).
+This program almost exclusively limits itself to dependencies in (just) the Tree API. Support for
+`quasiquotes`_ is not in the *trees* artifact, but in *scalameta* (which depends on *trees*).
+Program *ShowSourceContents* uses quasiquotes to a limited extent. This program also uses
+"scalameta contributions" (also part of the *scalameta* artifact), for safe tree comparisons.
+
+The (general) Tree query API of scalameta is a bit minimal, offering functions such as *collect*
+(or "custom traversal support"). Function *collect* (in "XPath terms") not only returns matching
+descendant tree nodes, but also the matching descendants of the descendants, etc. Object
+*contrib.TreeOps* improves on that, but we do not need to stop there. Hence the creation of
+*QuerySupport* in this project. It is also inspired by XPath axes, but also offers methods to
+return only topmost descendant(-or-self) nodes, which is very often what is desired. Of course
+the scalameta Tree API also offers "specialized" query methods, for finding statements etc.
+Program *ShowSourceContents* uses both the latter specialized query methods and those in
+*QuerySupport*.
+
+Nevertheless, program *ShowSourceContents* shows how we can use ad-hoc Ammonite REPL sessions
+that offer "custom views" of code bases, in terms of program structure without knowing any context/
+semantics. This could be very helpful in getting a grip on very large code bases, and on how
+their parts "hang together".
+
+Semantic model generation
+=========================
+
+As said in the beginning, syntactic trees of Scala code are great, but they lack the semantics
+to do anything useful with them beyond querying/manipulating ASTs without knowing anything
+of the context. In particular, these trees know nothing about symbols and types. In other words,
+syntactic trees are conceptually comparable to the result of the first phase of `Scala compilation`_,
+which is the parser phase. At that point, only the structure of the code is known, without any context.
+
+Fortunately, Scalameta can be used to generate a `Semantic model`_, called SemanticDB. This model
+can be leveraged by multiple metaprogramming tools, which therefore are not bothered with compiler
+internals.
+
+The SemanticDB model of a program is generated by the *metac* tool, which leverages the Scala
+compiler (but outputting SemanticDB instead of class files or Tasty files). It therefore depends
+on the Scala compiler. The *metac* tool is inside the *scalameta* artifact, so the latter
+depends on the Scala compiler (as well as on *trees*)::
+
+    cs resolve org.scalameta:scalameta_2.13:4.4.33 -t
+
+      Result:
+    └─ org.scalameta:scalameta_2.13:4.4.33
+       ├─ org.scala-lang:scala-library:2.13.8
+       ├─ org.scala-lang:scalap:2.13.8
+       │  └─ org.scala-lang:scala-compiler:2.13.8
+       │     ├─ net.java.dev.jna:jna:5.9.0
+       │     ├─ org.jline:jline:3.21.0
+       │     ├─ org.scala-lang:scala-library:2.13.8
+       │     └─ org.scala-lang:scala-reflect:2.13.8
+       │        └─ org.scala-lang:scala-library:2.13.8
+       └─ org.scalameta:parsers_2.13:4.4.33
+          ├─ org.scala-lang:scala-library:2.13.8
+          └─ org.scalameta:trees_2.13:4.4.33
+             ├─ org.scala-lang:scala-library:2.13.8
+             ├─ org.scalameta:common_2.13:4.4.33
+             │  ├─ com.lihaoyi:sourcecode_2.13:0.2.7
+             │  ├─ com.thesamet.scalapb:scalapb-runtime_2.13:0.11.4
+             │  │  ├─ com.google.protobuf:protobuf-java:3.15.8
+             │  │  ├─ com.thesamet.scalapb:lenses_2.13:0.11.4
+             │  │  │  ├─ org.scala-lang:scala-library:2.13.6 -> 2.13.8
+             │  │  │  └─ org.scala-lang.modules:scala-collection-compat_2.13:2.4.4
+             │  │  │     └─ org.scala-lang:scala-library:2.13.5 -> 2.13.8
+             │  │  ├─ org.scala-lang:scala-library:2.13.6 -> 2.13.8
+             │  │  └─ org.scala-lang.modules:scala-collection-compat_2.13:2.4.4
+             │  │     └─ org.scala-lang:scala-library:2.13.5 -> 2.13.8
+             │  └─ org.scala-lang:scala-library:2.13.8
+             └─ org.scalameta:fastparse-v2_2.13:2.3.1
+                ├─ com.lihaoyi:geny_2.13:0.6.5
+                └─ com.lihaoyi:sourcecode_2.13:0.2.3 -> 0.2.7
+
+How can we generate SemanticDB models for a certain Scala code base? As described in
+`Semantic model`_, support for SemanticDB model generation can easily be added to `sbt`_ projects.
+For Maven projects, a similar Maven plugin exists.
+
+Yet, if needed, this can also be achieved directly at the low level of `scalac`_. First recall
+that one way to invoke scalac (analogous to the javac Java compiler) is as follows::
+
+    scalac @/path/to/options @/path/to/sources
+
+The metac tool can be invoked in the same way, with the same "options" and "sources" files::
+
+    metac @/path/to/options @/path/to/sources
+
+Below it is described how such a setup can be achieved (for non-trivial projects). It is
+assumed that Scala 2.13 is used, both in the code base against which the metac tool is run
+and in the scalac and metac tools themselves (obviously). The idea is to generate the "options"
+and "sources" files, and then run metac using those 2 files. Let's assume the code base
+corresponds to artifact ``eu.cdevreeze.tqa:tqa_2.13:0.13.0``, and that Coursier has been
+installed (like scalac for Scala 2.13 and metac). The needed steps are:
+
+* Generate the "options" file
+
+  * Run a command like ``cs fetch --classpath -E org.scala-lang:scala-library eu.cdevreeze.tqa:tqa_2.13:0.13.0``
+  * Remove the top-level (tqa) dependency itself from the generated classpath string
+  * Add ``-cp <classpath string>`` to an empty "options" file, on 2 lines (one with "-cp" and one with the classpath)
+  * Add other options to the "options" file, for encoding, destination, compiler options, etc. (minding newlines)
+
+* Generate the "sources" file, from the output of trivial program *FindSourcePaths*
+* Invoke the scalac (Scala compiler) command against these "options" and "sources" files, making sure it works
+* Now invoke the metac command in the same way
+
+Using SemanticDB models
+=======================
+
+TODO
+
+Conclusion
+==========
+
+It is hoped that this project can help in quickly scripting some Scala code analysis, using Ammonite
+REPL sessions or Scalafix rules. Some of the code in this project could first be copied into
+those REPL sessions.
 
 .. _`Scalameta`: https://scalameta.org/docs/trees/guide.html
+.. _`Tree API`: https://scalameta.org/docs/trees/guide.html
+.. _`Semantic model`: https://scalameta.org/docs/semanticdb/guide.html#consuming-semanticdb
 .. _`Tree Guide`: https://scalameta.org/docs/trees/guide.html
 .. _`Tree API documentation`: https://www.javadoc.io/doc/org.scalameta/trees_2.13/latest/scala/meta/Tree.html
+.. _`FastParse`: https://com-lihaoyi.github.io/fastparse/
+.. _`Coursier`: https://get-coursier.io/
 .. _`quasiquotes`: https://scalameta.org/docs/trees/quasiquotes.html
-
+.. _`Scala compilation`: https://docs.scala-lang.org/overviews/compiler-options/index.html
+.. _`sbt`: https://www.scala-sbt.org/
+.. _`scalac`: https://docs.scala-lang.org/overviews/compiler-options/index.html
