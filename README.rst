@@ -45,17 +45,17 @@ Program *ShowSourceContents* uses quasiquotes to a limited extent. This program 
 "scalameta contributions" (also part of the *scalameta* artifact), for safe tree comparisons.
 
 The (general) Tree query API of scalameta is a bit minimal, offering functions such as *collect*
-(or "custom traversal support"). Function *collect* (in "XPath terms") not only returns matching
-descendant tree nodes, but also the matching descendants of the descendants, etc. Object
-*contrib.TreeOps* improves on that, but we do not need to stop there. Hence the creation of
-*QuerySupport* in this project. It is also inspired by XPath axes, but also offers methods to
-return only topmost descendant(-or-self) nodes, which is very often what is desired. Of course
-the scalameta Tree API also offers "specialized" query methods, for finding statements etc.
-Program *ShowSourceContents* uses both the latter specialized query methods and those in
-*QuerySupport*.
+(or "custom traversal support" if more fine-grained control is needed than *collect* and friends offer).
+Function *collect* not only returns matching descendant tree nodes (in "XPath terms"), but also
+the matching descendants of the descendants, etc. Object *contrib.TreeOps* improves on the minimal query API,
+but we do not need to stop there. Hence the creation of *QuerySupport* in this project. It is
+also inspired by XPath axes, but also offers methods to return only topmost descendant(-or-self)
+nodes, which is very often what is desired. Of course the scalameta Tree API also offers "specialized"
+query methods, for finding statements etc. Program *ShowSourceContents* uses both the latter
+specialized query methods and those in *QuerySupport*.
 
 Nevertheless, program *ShowSourceContents* shows how we can use ad-hoc Ammonite REPL sessions
-that offer "custom views" of code bases, in terms of program structure without knowing any context/
+that offer "custom views" of code bases, in terms of program structure, without knowing any context/
 semantics. This could be very helpful in getting a grip on very large code bases, and on how
 their parts "hang together".
 
@@ -64,7 +64,7 @@ Semantic model generation
 
 As said in the beginning, syntactic trees of Scala code are great, but they lack the semantics
 to do anything useful with them beyond querying/manipulating ASTs without knowing anything
-of the context. In particular, these trees know nothing about symbols and types. In other words,
+of the (semantical) context. In particular, these trees know nothing about symbols and types. In other words,
 syntactic trees are conceptually comparable to the result of the first phase of `Scala compilation`_,
 which is the parser phase. At that point, only the structure of the code is known, without any context.
 
@@ -140,6 +140,15 @@ installed (like scalac for Scala 2.13 and metac). The needed steps are:
 * Invoke the scalac (Scala compiler) command against these "options" and "sources" files, making sure it works
 * Now invoke the metac command in the same way
 
+Things may be a bit more involved than mentioned above. First of all, the "Coursier fetch" command
+may need to point to custom repositories and may need corresponding credentials. Secondly, it is
+very important to create a "closed set" of sources (as in closed under compilation, as a set of source
+files and dependencies).
+
+Of course this is quite a cumbersome way to generate SemanticDB output, and not recommended
+in sbt projects or even Maven projects. Yet it does give a feel for how metac leverages scalac,
+and it can be used as fallback scenario if all else fails.
+
 Using SemanticDB models
 =======================
 
@@ -152,9 +161,9 @@ It is hoped that this project can help in quickly scripting some Scala code anal
 REPL sessions or Scalafix rules. Some of the code in this project could first be copied into
 those REPL sessions.
 
-.. _`Scalameta`: https://scalameta.org/docs/trees/guide.html
+.. _`Scalameta`: https://scalameta.org
 .. _`Tree API`: https://scalameta.org/docs/trees/guide.html
-.. _`Semantic model`: https://scalameta.org/docs/semanticdb/guide.html#consuming-semanticdb
+.. _`Semantic model`: https://scalameta.org/docs/semanticdb/guide.html
 .. _`Tree Guide`: https://scalameta.org/docs/trees/guide.html
 .. _`Tree API documentation`: https://www.javadoc.io/doc/org.scalameta/trees_2.13/latest/scala/meta/Tree.html
 .. _`FastParse`: https://com-lihaoyi.github.io/fastparse/
