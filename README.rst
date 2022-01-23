@@ -136,7 +136,7 @@ installed (like scalac for Scala 2.13 and metac). The needed steps are:
   * Add ``-cp <classpath string>`` to an empty "options" file, on 2 lines (one with "-cp" and one with the classpath)
   * Add other options to the "options" file, for encoding, destination, compiler options, etc. (minding newlines)
 
-* Generate the "sources" file, from the output of trivial program *FindSourcePaths*
+* Generate the "sources" file, using trivial program *FindSourcePaths* and saving its output
 * Invoke the scalac (Scala compiler) command against these "options" and "sources" files, making sure it works
 * Now invoke the metac command in the same way
 
