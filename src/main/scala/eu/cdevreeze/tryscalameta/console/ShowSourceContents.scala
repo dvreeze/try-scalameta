@@ -48,7 +48,7 @@ object ShowSourceContents {
   private val emptySelf: Self = Self(Name(""), None)
 
   def main(args: Array[String]): Unit = {
-    require(args.sizeIs == 1, s"Missing source file or (root) directory path")
+    require(args.lengthIs == 1, s"Missing source file or (root) directory path. Usage: ShowSourceContents <path>")
 
     val sourcePath: Path = Paths.get(new File(args(0)).toURI)
 

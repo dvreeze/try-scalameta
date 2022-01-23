@@ -43,7 +43,7 @@ object VirtualFileSupport {
   }
 
   def findAllSourceFiles(dir: Path, isSource: Path => Boolean): Seq[Input.VirtualFile] = {
-    require(dir.toFile.isDirectory, s"Not a directory: $dir")
+    require(Files.isDirectory(dir), s"Not a directory: $dir")
 
     findAllNormalFiles(dir).filter(isSource).map(makeVirtualFile)
   }
