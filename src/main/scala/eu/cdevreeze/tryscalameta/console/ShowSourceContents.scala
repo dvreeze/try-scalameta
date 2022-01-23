@@ -23,11 +23,13 @@ import java.nio.file.Paths
 
 import scala.meta.Decl
 import scala.meta.Defn
+import scala.meta.Init
 import scala.meta.Mod
 import scala.meta.Name
 import scala.meta.Self
 import scala.meta.Source
 import scala.meta.Stat
+import scala.meta.Type
 import scala.meta.XtensionQuasiquoteTerm
 import scala.meta.XtensionQuasiquoteType
 import scala.meta.contrib._
@@ -199,7 +201,7 @@ object ShowSourceContents {
   private def isPublic(mods: List[Mod]): Boolean = !mods.exists(_.isAccessMod)
 
   private def removeThrowsAnnot(mods: List[Mod]): List[Mod] = mods.filterNot {
-    case m: Mod.Annot if m.init.name.value == "throws" => true
+    case Mod.Annot(Init(Type.Apply(Type.Name("throws"), _), _, _)) => true
     case _ => false
   }
 }
