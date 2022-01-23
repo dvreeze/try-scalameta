@@ -28,7 +28,6 @@ import scala.meta.Name
 import scala.meta.Self
 import scala.meta.Source
 import scala.meta.Stat
-import scala.meta.XtensionQuasiquoteMod
 import scala.meta.XtensionQuasiquoteTerm
 import scala.meta.XtensionQuasiquoteType
 import scala.meta.contrib._
@@ -199,5 +198,8 @@ object ShowSourceContents {
 
   private def isPublic(mods: List[Mod]): Boolean = !mods.exists(_.isAccessMod)
 
-  private def removeThrowsAnnot(mods: List[Mod]): List[Mod] = mods.filterNot(Set(mod"@throws"))
+  private def removeThrowsAnnot(mods: List[Mod]): List[Mod] = mods.filterNot {
+    case m: Mod.Annot if m.init.name.value == "throws" => true
+    case _ => false
+  }
 }
