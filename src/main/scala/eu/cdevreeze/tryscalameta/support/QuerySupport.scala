@@ -132,7 +132,7 @@ object QuerySupport {
     // Descendant axis
 
     def filterDescendants[A <: Tree : ClassTag](p: A => Boolean): List[A] = {
-      tree.children.flatMap(_.filterDescendantsOrSelf[A](p)) // Same as collect, it seems
+      tree.children.flatMap(_.filterDescendantsOrSelf[A](p))
     }
 
     def findAllDescendants[A <: Tree : ClassTag](): List[A] = filterDescendants[A](_ => true)
