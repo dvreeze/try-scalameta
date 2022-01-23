@@ -28,6 +28,7 @@ import scala.meta.Name
 import scala.meta.Self
 import scala.meta.Source
 import scala.meta.Stat
+import scala.meta.XtensionQuasiquoteMod
 import scala.meta.XtensionQuasiquoteTerm
 import scala.meta.XtensionQuasiquoteType
 import scala.meta.contrib._
@@ -160,7 +161,7 @@ object ShowSourceContents {
   }
 
   private def printDefDefn(defn: Defn.Def, indent: String): Unit = {
-    println(indent + defn.copy(body = q"body_placeholder").syntax)
+    println(indent + defn.copy(body = q"body_placeholder", mods = removeThrowsAnnot(defn.mods)).syntax)
   }
 
   private def printValDefn(defn: Defn.Val, indent: String): Unit = {
@@ -180,7 +181,7 @@ object ShowSourceContents {
   }
 
   private def printDefDecl(decl: Decl.Def, indent: String): Unit = {
-    println(indent + decl.syntax)
+    println(indent + decl.copy(mods = removeThrowsAnnot(decl.mods)).syntax)
   }
 
   private def printValDecl(decl: Decl.Val, indent: String): Unit = {
@@ -197,4 +198,6 @@ object ShowSourceContents {
   }
 
   private def isPublic(mods: List[Mod]): Boolean = !mods.exists(_.isAccessMod)
+
+  private def removeThrowsAnnot(mods: List[Mod]): List[Mod] = mods.filterNot(Set(mod"@throws"))
 }
