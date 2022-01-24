@@ -29,25 +29,28 @@ import scala.meta.Name
 import scala.meta.Self
 import scala.meta.Source
 import scala.meta.Stat
+import scala.meta.Tree
 import scala.meta.Type
 import scala.meta.XtensionQuasiquoteTerm
 import scala.meta.XtensionQuasiquoteType
 import scala.meta.contrib._
+import scala.util.chaining.scalaUtilChainingOps
 
 import eu.cdevreeze.tryscalameta.support.QuerySupport._
 import eu.cdevreeze.tryscalameta.support.VirtualFileSupport._
 
 /**
- * Prints a somewhat javap-like output (using Scala-like syntax) about one or more given directories of source files
- * to the console, ignoring non-public content.
+ * Prints a "view" of Scala files found in one or more given source file root directories to the console.
+ * This output (per Scala source) is conceptually a bit javap-like (using defaults), as in that only public
+ * members are shown and that method implementations are left out. The output looks like valid Scala, and is indeed
+ * syntactically parseable by scalameta, but would not compile.
  *
  * @author
  *   Chris de Vreeze
  */
 object ShowSourceContents {
 
-  private val deltaIndent = "  "
-  private val emptySelf: Self = Self(Name(""), None)
+  private val emptySelf: Self = Self(Name.Anonymous(), None)
 
   private final case class SourceWithPath(source: Source, absolutePath: Path, sourceRootDir: Path) {
     require(Files.isDirectory(sourceRootDir), s"Not a directory: '$sourceRootDir")
@@ -67,130 +70,140 @@ object ShowSourceContents {
       sourceDirs.flatMap { sourceDir =>
         findAllScalaSourceFiles(sourceDir).map { f =>
           val source: Source = f.parse[Source].get
+          checkParentOfChildrenIsThis(source)
+          require(source.parent.isEmpty)
           SourceWithPath(source, new File(f.path).toPath, sourceDir)
         }
       }
     }
 
-    printSources(sources)
-  }
+    val newSources: Seq[SourceWithPath] = transformSources(sources)
 
-  def printSources(sources: Seq[SourceWithPath]): Unit = {
-    sources.foreach { sourceWithPath =>
+    newSources.foreach { sourceWithPath =>
       println()
-      println(s"Source (in ${sourceWithPath.relativePath}):")
+      println(s"----- Source (in ${sourceWithPath.relativePath}) -----")
       println()
-      printSource(sourceWithPath.source)
+      println(sourceWithPath.source.syntax)
     }
   }
 
-  def printSource(source: Source): Unit = {
-    val newIndent = deltaIndent
+  private def transformSources(sources: Seq[SourceWithPath]): Seq[SourceWithPath] = {
+    sources.map(transformSource)
+  }
 
+  private def transformSource(source: SourceWithPath): SourceWithPath = {
+    SourceWithPath(transformSource(source.source), source.absolutePath, source.sourceRootDir)
+  }
+
+  def transformSource(source: Source): Source = {
     // Note that a statement is either a definition, declaration, term or import. Here the latter two are ignored.
     // Note that we must also go inside packages (which are statements themselves), and not stop there.
-    source.stats.flatMap(_.findTopmostOrSelf[Stat](isDefnOrDecl)).foreach {
-      case defn: Defn => printDefn(defn, newIndent)
-      case decl: Decl => printDecl(decl, newIndent)
-      case _          => ()
+    val newStats: List[Stat] = {
+      source.stats.flatMap(_.findTopmostOrSelf[Stat](isDefnOrDecl)).flatMap {
+        case defn: Defn => optionallyTransformDefn(defn)
+        case decl: Decl => optionallyTransformDecl(decl)
+        case _          => None
+      }
     }
+
+    source.copy(stats = newStats).tap(t => checkParentOfChildrenIsThis(t)).ensuring(_.parent.isEmpty)
   }
 
-  private def printDefn(defn: Defn, indent: String): Unit = {
+  private def optionallyTransformDefn(defn: Defn): Option[Defn] = {
     defn match {
-      case defn: Defn.Trait if isPublic(defn.mods)  => printTraitDefn(defn, indent)
-      case defn: Defn.Class if isPublic(defn.mods)  => printClassDefn(defn, indent)
-      case defn: Defn.Object if isPublic(defn.mods) => printObjectDefn(defn, indent)
-      case defn: Defn.Def if isPublic(defn.mods)    => printDefDefn(defn, indent)
-      case defn: Defn.Val if isPublic(defn.mods)    => printValDefn(defn, indent)
-      case defn: Defn.Var if isPublic(defn.mods)    => printVarDefn(defn, indent)
-      case defn: Defn.Type if isPublic(defn.mods)   => printTypeDefn(defn, indent)
-      case _                                        => ()
+      case defn: Defn.Trait if isPublic(defn.mods)  => Some(transformTraitDefn(defn))
+      case defn: Defn.Class if isPublic(defn.mods)  => Some(transformClassDefn(defn))
+      case defn: Defn.Object if isPublic(defn.mods) => Some(transformObjectDefn(defn))
+      case defn: Defn.Def if isPublic(defn.mods)    => Some(transformDefDefn(defn))
+      case defn: Defn.Val if isPublic(defn.mods)    => Some(transformValDefn(defn))
+      case defn: Defn.Var if isPublic(defn.mods)    => Some(transformVarDefn(defn))
+      case defn: Defn.Type if isPublic(defn.mods)   => Some(transformTypeDefn(defn))
+      case _                                        => None
     }
   }
 
-  private def printDecl(decl: Decl, indent: String): Unit = {
+  private def optionallyTransformDecl(decl: Decl): Option[Decl] = {
     decl match {
-      case decl: Decl.Def if isPublic(decl.mods)  => printDefDecl(decl, indent)
-      case decl: Decl.Val if isPublic(decl.mods)  => printValDecl(decl, indent)
-      case decl: Decl.Var if isPublic(decl.mods)  => printVarDecl(decl, indent)
-      case decl: Decl.Type if isPublic(decl.mods) => printTypeDecl(decl, indent)
-      case _                                      => ()
+      case decl: Decl.Def if isPublic(decl.mods)  => Some(transformDefDecl(decl))
+      case decl: Decl.Val if isPublic(decl.mods)  => Some(transformValDecl(decl))
+      case decl: Decl.Var if isPublic(decl.mods)  => Some(transformVarDecl(decl))
+      case decl: Decl.Type if isPublic(decl.mods) => Some(transformTypeDecl(decl))
+      case _                                      => None
     }
   }
 
-  private def printTraitDefn(defn: Defn.Trait, indent: String): Unit = {
-    val newIndent = indent + deltaIndent
-
+  private def transformTraitDefn(defn: Defn.Trait): Defn.Trait = {
     assert(defn.templ.stats.forall(_.findFirstAncestor[Stat]().exists(_.isEqual(defn))))
 
-    println(indent + defn.copy(templ = defn.templ.copy(stats = Nil, self = emptySelf)).syntax + ":")
-
-    defn.templ.findTopmost[Stat](isDefnOrDecl).foreach {
-      case defn: Defn => printDefn(defn, newIndent)
-      case decl: Decl => printDecl(decl, newIndent)
-      case _          => ()
+    val newStats: List[Stat] = {
+      defn.templ.findTopmost[Stat](isDefnOrDecl).flatMap {
+        case defn: Defn => optionallyTransformDefn(defn)
+        case decl: Decl => optionallyTransformDecl(decl)
+        case t          => Option(t)
+      }
     }
+
+    defn.copy(templ = defn.templ.copy(stats = newStats, self = emptySelf))
   }
 
-  private def printClassDefn(defn: Defn.Class, indent: String): Unit = {
-    val newIndent = indent + deltaIndent
-
+  private def transformClassDefn(defn: Defn.Class): Defn.Class = {
     assert(defn.templ.stats.forall(_.findFirstAncestor[Stat]().exists(_.isEqual(defn))))
 
-    println(indent + defn.copy(templ = defn.templ.copy(stats = Nil, self = emptySelf)).syntax + ":")
-
-    defn.templ.findTopmost[Stat](isDefnOrDecl).foreach {
-      case defn: Defn => printDefn(defn, newIndent)
-      case decl: Decl => printDecl(decl, newIndent)
-      case _          => ()
+    val newStats: List[Stat] = {
+      defn.templ.findTopmost[Stat](isDefnOrDecl).flatMap {
+        case defn: Defn => optionallyTransformDefn(defn)
+        case decl: Decl => optionallyTransformDecl(decl)
+        case t          => Option(t)
+      }
     }
+
+    defn.copy(templ = defn.templ.copy(stats = newStats, self = emptySelf))
   }
 
-  private def printObjectDefn(defn: Defn.Object, indent: String): Unit = {
-    val newIndent = indent + deltaIndent
-
+  private def transformObjectDefn(defn: Defn.Object): Defn.Object = {
     assert(defn.templ.stats.forall(_.findFirstAncestor[Stat]().exists(_.isEqual(defn))))
 
-    println(indent + defn.copy(templ = defn.templ.copy(stats = Nil, self = emptySelf)).syntax + ":")
-
-    defn.templ.findTopmost[Stat](isDefnOrDecl).foreach {
-      case defn: Defn => printDefn(defn, newIndent)
-      case decl: Decl => printDecl(decl, newIndent)
-      case _          => ()
+    val newStats: List[Stat] = {
+      defn.templ.findTopmost[Stat](isDefnOrDecl).flatMap {
+        case defn: Defn => optionallyTransformDefn(defn)
+        case decl: Decl => optionallyTransformDecl(decl)
+        case t          => Option(t)
+      }
     }
+
+    defn.copy(templ = defn.templ.copy(stats = newStats, self = emptySelf))
   }
 
-  private def printDefDefn(defn: Defn.Def, indent: String): Unit = {
-    println(indent + defn.copy(body = q"body_placeholder", mods = removeThrowsAnnot(defn.mods)).syntax)
+  private def transformDefDefn(defn: Defn.Def): Defn.Def = {
+    defn.copy(body = q"body_placeholder", mods = removeThrowsAnnot(defn.mods))
   }
 
-  private def printValDefn(defn: Defn.Val, indent: String): Unit = {
-    println(indent + defn.copy(rhs = q"rhs_placeholder").syntax)
+  private def transformValDefn(defn: Defn.Val): Defn.Val = {
+    defn.copy(rhs = q"rhs_placeholder")
   }
 
-  private def printVarDefn(defn: Defn.Var, indent: String): Unit = {
-    println(indent + defn.copy(rhs = Some(q"rhs_placeholder")).syntax)
+  private def transformVarDefn(defn: Defn.Var): Defn.Var = {
+    defn.copy(rhs = Some(q"rhs_placeholder"))
   }
 
-  private def printTypeDefn(defn: Defn.Type, indent: String): Unit = {
-    println(indent + defn.copy(body = t"body_placeholder").syntax)
+  private def transformTypeDefn(defn: Defn.Type): Defn.Type = {
+    defn.copy(body = t"body_placeholder")
   }
 
-  private def printTypeDecl(decl: Decl.Type, indent: String): Unit = {
-    println(indent + decl.syntax)
+  private def transformTypeDecl(decl: Decl.Type): Decl.Type = {
+    decl
   }
 
-  private def printDefDecl(decl: Decl.Def, indent: String): Unit = {
-    println(indent + decl.copy(mods = removeThrowsAnnot(decl.mods)).syntax)
+  private def transformDefDecl(decl: Decl.Def): Decl.Def = {
+    decl.copy(mods = removeThrowsAnnot(decl.mods))
   }
 
-  private def printValDecl(decl: Decl.Val, indent: String): Unit = {
-    println(indent + decl.syntax)
+  private def transformValDecl(decl: Decl.Val): Decl.Val = {
+    decl
   }
 
-  private def printVarDecl(decl: Decl.Var, indent: String): Unit = {
-    println(indent + decl.syntax)
+  private def transformVarDecl(decl: Decl.Var): Decl.Var = {
+    decl
   }
 
   private def isDefnOrDecl(stat: Stat): Boolean = stat match {
@@ -202,6 +215,14 @@ object ShowSourceContents {
 
   private def removeThrowsAnnot(mods: List[Mod]): List[Mod] = mods.filterNot {
     case Mod.Annot(Init(Type.Apply(Type.Name("throws"), _), _, _)) => true
-    case _ => false
+    case _                                                         => false
+  }
+
+  private def checkParentOfChildrenIsThis(tree: Tree): Unit = {
+    tree.findAllDescendants[Tree]().foreach { tree =>
+      require(
+        tree.children.forall(_.parent.exists(_.isEqual(tree))),
+        s"The parent of the children of some tree is not the tree")
+    }
   }
 }

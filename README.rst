@@ -10,6 +10,7 @@ Syntactic Tree API
 
 The syntactic tree model is the AST (abstract syntax tree) of parsed Scala code, without any
 semantic information such as symbols and types. See `Tree Guide`_ and `Tree API documentation`_.
+Also see `Tree examples`_ in particular, both for learning purposes and as reference material.
 This syntactic model does show the syntactic structure of a Scala program, but it lacks the
 (semantic) data to navigate from function calls to function definitions, for example.
 
@@ -177,3 +178,4 @@ those REPL sessions.
 .. _`Scala compilation`: https://docs.scala-lang.org/overviews/compiler-options/index.html
 .. _`sbt`: https://www.scala-sbt.org/
 .. _`scalac`: https://docs.scala-lang.org/overviews/compiler-options/index.html
+.. _`Tree examples`: https://scalameta.org/docs/trees/examples.html
