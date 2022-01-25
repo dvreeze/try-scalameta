@@ -43,11 +43,10 @@ import eu.cdevreeze.tryscalameta.support.QuerySupport._
 import eu.cdevreeze.tryscalameta.support.VirtualFileSupport._
 
 /**
- * Prints a "view" of Scala files found in one or more given source file root directories to the console.
- * This output (per Scala source) is conceptually a bit javap-like (using defaults), such that only public
- * members are shown and that method implementations are left out. The output looks like valid Scala, and is indeed
- * syntactically parseable by scalameta, but would not compile. The output can even be fed to Scalafmt (in sbt,
- * use task scalafmtOnly)!
+ * Prints a "view" of Scala files found in one or more given source file root directories to the console. This output
+ * (per Scala source) is conceptually a bit javap-like (using defaults), such that only public members are shown and
+ * that method implementations are left out. The output looks like valid Scala, and is indeed syntactically parseable by
+ * scalameta, but would not compile. The output can even be fed to Scalafmt (in sbt, use task scalafmtOnly)!
  *
  * @author
  *   Chris de Vreeze
@@ -186,7 +185,9 @@ object ShowSourceContents {
   }
 
   private def transformDefDefn(defn: Defn.Def): Defn.Def = {
-    defn.copy(body = q"body_placeholder", mods = removeThrowsAnnot(defn.mods))
+    defn
+      .copy(body = q"body_placeholder", mods = removeThrowsAnnot(defn.mods))
+      .pipe(removeDefaultArgs)
   }
 
   private def transformValDefn(defn: Defn.Val): Defn.Val = {
@@ -206,7 +207,9 @@ object ShowSourceContents {
   }
 
   private def transformDefDecl(decl: Decl.Def): Decl.Def = {
-    decl.copy(mods = removeThrowsAnnot(decl.mods))
+    decl
+      .copy(mods = removeThrowsAnnot(decl.mods))
+      .pipe(removeDefaultArgs)
   }
 
   private def transformValDecl(decl: Decl.Val): Decl.Val = {
@@ -229,11 +232,22 @@ object ShowSourceContents {
     case _                                                         => false
   }
 
+  private def removeDefaultArgs(decl: Decl.Def): Decl.Def = {
+    decl.copy(paramss = decl.paramss.map(_.map(removeDefaultArgs)))
+  }
+
+  private def removeDefaultArgs(defn: Defn.Def): Defn.Def = {
+    defn.copy(paramss = defn.paramss.map(_.map(removeDefaultArgs)))
+  }
+
+  private def removeDefaultArgs(param: Term.Param): Term.Param = param.copy(default = None)
+
   private def checkParentOfChildrenIsThis(tree: Tree): Unit = {
     tree.findAllDescendants[Tree]().foreach { tree =>
       require(
         tree.children.forall(_.parent.exists(_.isEqual(tree))),
-        s"The parent of the children of some tree is not the tree")
+        s"The parent of the children of some tree is not the tree"
+      )
     }
   }
 }
