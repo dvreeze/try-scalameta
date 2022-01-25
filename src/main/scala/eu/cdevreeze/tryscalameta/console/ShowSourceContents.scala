@@ -21,6 +21,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 
+import scala.meta.Ctor
 import scala.meta.Decl
 import scala.meta.Defn
 import scala.meta.Init
@@ -87,6 +88,9 @@ object ShowSourceContents {
 
     val newSources: Seq[SourceWithPath] = transformSources(sources)
 
+    def removeRhs(stat: Stat): Stat =
+      stat.transform { case t: Term.Assign => t.copy(rhs = rhsPlaceholder) }.asInstanceOf[Stat]
+
     val newSource: Source = Source(stats =
       List(
         Defn.Object(
@@ -96,7 +100,7 @@ object ShowSourceContents {
             early = Nil,
             inits = Nil,
             self = emptySelf,
-            stats = newSources.map(addCommentsAsAnnots).flatMap(_.stats).toList
+            stats = newSources.map(addCommentsAsAnnots).flatMap(_.stats).map(removeRhs).toList
           )
         )
       )
@@ -175,7 +179,7 @@ object ShowSourceContents {
       }
     }
 
-    defn.copy(templ = defn.templ.copy(stats = newStats, self = emptySelf))
+    defn.copy(templ = defn.templ.copy(stats = newStats, self = emptySelf), ctor = removeDefaultArgs(defn.ctor))
   }
 
   private def transformObjectDefn(defn: Defn.Object): Defn.Object = {
@@ -269,6 +273,10 @@ object ShowSourceContents {
   private def removeThrowsAnnot(mods: List[Mod]): List[Mod] = mods.filterNot {
     case Mod.Annot(Init(Type.Apply(Type.Name("throws"), _), _, _)) => true
     case _                                                         => false
+  }
+
+  private def removeDefaultArgs(ctor: Ctor.Primary): Ctor.Primary = {
+    ctor.copy(paramss = ctor.paramss.map(_.map(removeDefaultArgs)))
   }
 
   private def removeDefaultArgs(decl: Decl.Def): Decl.Def = {
