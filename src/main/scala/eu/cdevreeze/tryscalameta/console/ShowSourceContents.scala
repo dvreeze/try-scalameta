@@ -24,6 +24,7 @@ import java.nio.file.Paths
 import scala.meta.Decl
 import scala.meta.Defn
 import scala.meta.Init
+import scala.meta.Lit
 import scala.meta.Mod
 import scala.meta.Name
 import scala.meta.Self
@@ -82,11 +83,22 @@ object ShowSourceContents {
 
     val newSources: Seq[SourceWithPath] = transformSources(sources)
 
-    println("object CombinedCode {")
-    newSources.foreach { source =>
-      addComments(source).foreach(stat => println(stat.syntax))
-    }
-    println("}")
+    val newSource: Source = Source(stats =
+      List(
+        Defn.Object(
+          mods = Nil,
+          name = Term.Name("CombinedSource"),
+          templ = Template(
+            early = Nil,
+            inits = Nil,
+            self = emptySelf,
+            stats = newSources.map(addCommentsAsAnnots).flatMap(_.stats).toList
+          )
+        )
+      )
+    )
+
+    println(newSource.syntax)
   }
 
   def transformSource(source: Source): Source = {
@@ -101,14 +113,6 @@ object ShowSourceContents {
     }
 
     source.copy(stats = newStats).tap(t => checkParentOfChildrenIsThis(t)).ensuring(_.parent.isEmpty)
-  }
-
-  private def addComments(sourceWithPath: SourceWithPath): Seq[Stat] = {
-    val statLines: Seq[String] = sourceWithPath.source.stats.map { source =>
-      Seq("", s"// ----- ${sourceWithPath.relativePath} -----", source.syntax).mkString("\n")
-    }
-    val stats: Seq[Stat] = statLines.map(_.parse[Stat].get)
-    stats
   }
 
   private def transformSources(sources: Seq[SourceWithPath]): Seq[SourceWithPath] = {
@@ -218,6 +222,37 @@ object ShowSourceContents {
 
   private def transformVarDecl(decl: Decl.Var): Decl.Var = {
     decl
+  }
+
+  private def addCommentsAsAnnots(sourceWithPath: SourceWithPath): Source = {
+    val commentString = s"File: ${sourceWithPath.relativePath}"
+
+    sourceWithPath.source.copy(stats = sourceWithPath.source.stats.map(stat => addCommentAsAnnot(stat, commentString)))
+  }
+
+  private def addCommentAsAnnot(stat: Stat, comment: String): Stat = {
+    stat match {
+      case defn: Defn.Trait  => defn.copy(mods = addCommentAsAnnot(defn.mods, comment))
+      case defn: Defn.Class  => defn.copy(mods = addCommentAsAnnot(defn.mods, comment))
+      case defn: Defn.Object => defn.copy(mods = addCommentAsAnnot(defn.mods, comment))
+      case defn: Defn.Def    => defn.copy(mods = addCommentAsAnnot(defn.mods, comment))
+      case defn: Defn.Val    => defn.copy(mods = addCommentAsAnnot(defn.mods, comment))
+      case defn: Defn.Var    => defn.copy(mods = addCommentAsAnnot(defn.mods, comment))
+      case defn: Defn.Type   => defn.copy(mods = addCommentAsAnnot(defn.mods, comment))
+      case decl: Decl.Def    => decl.copy(mods = addCommentAsAnnot(decl.mods, comment))
+      case decl: Decl.Val    => decl.copy(mods = addCommentAsAnnot(decl.mods, comment))
+      case decl: Decl.Var    => decl.copy(mods = addCommentAsAnnot(decl.mods, comment))
+      case decl: Decl.Type   => decl.copy(mods = addCommentAsAnnot(decl.mods, comment))
+      case t                 => t
+    }
+  }
+
+  private def addCommentAsAnnot(mods: List[Mod], comment: String): List[Mod] = {
+    mods.prepended(
+      Mod.Annot(init =
+        Init(tpe = Type.Name("comment"), name = Name.Anonymous(), argss = List(List(Lit.String(comment))))
+      )
+    )
   }
 
   private def isDefnOrDecl(stat: Stat): Boolean = stat match {
