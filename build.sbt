@@ -36,6 +36,8 @@ ThisBuild / libraryDependencies += "org.scalameta" %% "scalameta" % "4.4.33"
 
 ThisBuild / libraryDependencies += "com.typesafe" % "config" % "1.4.1"
 
+ThisBuild / libraryDependencies += "org.scalameta" % "scalafmt-interfaces" % "3.3.3"
+
 ThisBuild / libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.10" % Test
 
 lazy val root = project.in(file("."))

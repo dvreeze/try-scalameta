@@ -29,8 +29,11 @@ import scala.meta.Name
 import scala.meta.Self
 import scala.meta.Source
 import scala.meta.Stat
+import scala.meta.Template
+import scala.meta.Term
 import scala.meta.Tree
 import scala.meta.Type
+import scala.meta.XtensionParseInputLike
 import scala.meta.XtensionQuasiquoteTerm
 import scala.meta.XtensionQuasiquoteType
 import scala.meta.contrib._
@@ -41,9 +44,10 @@ import eu.cdevreeze.tryscalameta.support.VirtualFileSupport._
 
 /**
  * Prints a "view" of Scala files found in one or more given source file root directories to the console.
- * This output (per Scala source) is conceptually a bit javap-like (using defaults), as in that only public
+ * This output (per Scala source) is conceptually a bit javap-like (using defaults), such that only public
  * members are shown and that method implementations are left out. The output looks like valid Scala, and is indeed
- * syntactically parseable by scalameta, but would not compile.
+ * syntactically parseable by scalameta, but would not compile. The output can even be fed to Scalafmt (in sbt,
+ * use task scalafmtOnly)!
  *
  * @author
  *   Chris de Vreeze
@@ -79,20 +83,11 @@ object ShowSourceContents {
 
     val newSources: Seq[SourceWithPath] = transformSources(sources)
 
-    newSources.foreach { sourceWithPath =>
-      println()
-      println(s"----- Source (in ${sourceWithPath.relativePath}) -----")
-      println()
-      println(sourceWithPath.source.syntax)
+    println("object CombinedCode {")
+    newSources.foreach { source =>
+      addComments(source).foreach(stat => println(stat.syntax))
     }
-  }
-
-  private def transformSources(sources: Seq[SourceWithPath]): Seq[SourceWithPath] = {
-    sources.map(transformSource)
-  }
-
-  private def transformSource(source: SourceWithPath): SourceWithPath = {
-    SourceWithPath(transformSource(source.source), source.absolutePath, source.sourceRootDir)
+    println("}")
   }
 
   def transformSource(source: Source): Source = {
@@ -107,6 +102,22 @@ object ShowSourceContents {
     }
 
     source.copy(stats = newStats).tap(t => checkParentOfChildrenIsThis(t)).ensuring(_.parent.isEmpty)
+  }
+
+  private def addComments(sourceWithPath: SourceWithPath): Seq[Stat] = {
+    val statLines: Seq[String] = sourceWithPath.source.stats.map { source =>
+      Seq("", s"// ----- ${sourceWithPath.relativePath} -----", source.syntax).mkString("\n")
+    }
+    val stats: Seq[Stat] = statLines.map(_.parse[Stat].get)
+    stats
+  }
+
+  private def transformSources(sources: Seq[SourceWithPath]): Seq[SourceWithPath] = {
+    sources.map(transformSource)
+  }
+
+  private def transformSource(source: SourceWithPath): SourceWithPath = {
+    SourceWithPath(transformSource(source.source), source.absolutePath, source.sourceRootDir)
   }
 
   private def optionallyTransformDefn(defn: Defn): Option[Defn] = {
