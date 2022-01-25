@@ -21,20 +21,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 
-import scala.meta.Ctor
-import scala.meta.Decl
-import scala.meta.Defn
-import scala.meta.Init
-import scala.meta.Lit
-import scala.meta.Mod
-import scala.meta.Name
-import scala.meta.Self
-import scala.meta.Source
-import scala.meta.Stat
-import scala.meta.Template
-import scala.meta.Term
-import scala.meta.Tree
-import scala.meta.Type
+import scala.meta._
 import scala.meta.XtensionParseInputLike
 import scala.meta.contrib._
 import scala.util.chaining.scalaUtilChainingOps
@@ -88,8 +75,7 @@ object ShowSourceContents {
 
     val newSources: Seq[SourceWithPath] = transformSources(sources)
 
-    def removeRhs(stat: Stat): Stat =
-      stat.transform { case t: Term.Assign => t.copy(rhs = rhsPlaceholder) }.asInstanceOf[Stat]
+    def removeRhs(tree: Tree): Tree = tree.transform { case t: Term.Assign => t.copy(rhs = rhsPlaceholder) }
 
     val newSource: Source = Source(stats =
       List(
@@ -100,7 +86,7 @@ object ShowSourceContents {
             early = Nil,
             inits = Nil,
             self = emptySelf,
-            stats = newSources.map(addCommentsAsAnnots).flatMap(_.stats).map(removeRhs).toList
+            stats = newSources.map(addCommentsAsAnnots).flatMap(_.stats).map(removeRhs(_).asInstanceOf[Stat]).toList
           )
         )
       )
