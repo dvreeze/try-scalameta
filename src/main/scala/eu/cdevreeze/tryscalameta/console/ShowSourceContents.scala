@@ -17,6 +17,7 @@
 package eu.cdevreeze.tryscalameta.console
 
 import java.io.File
+import java.net.URI
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
@@ -28,14 +29,15 @@ import scala.util.chaining.scalaUtilChainingOps
 
 import eu.cdevreeze.tryscalameta.support.QuerySupport._
 import eu.cdevreeze.tryscalameta.support.VirtualFileSupport._
+import org.scalafmt.interfaces.Scalafmt
 
 /**
  * Prints a "view" of Scala files found in one or more given source file root directories to the console. This output
  * (per Scala source) is conceptually a bit javap-like (using defaults), such that only public members are shown and
  * that method implementations are left out. The output looks like valid Scala, and is indeed syntactically parseable by
- * scalameta, but would not compile. The output can even be fed to Scalafmt (in sbt, use task scalafmtOnly)! After that,
- * the result is best shown in an editor with syntax highlighting (but without showing compilation errors), such as
- * gedit.
+ * scalameta, but would not compile. The output has been prettified by Scalafmt, using the Scalafmt config file on the
+ * classpath. The result is best shown in an editor with syntax highlighting (but without showing compilation errors),
+ * such as gedit.
  *
  * @author
  *   Chris de Vreeze
@@ -92,7 +94,11 @@ object ShowSourceContents {
       )
     )
 
-    println(newSource.syntax)
+    val scalafmt: Scalafmt = getScalafmt()
+    val scalafmtConfig: Path = getScalafmtConfig()
+
+    val formattedSource: String = scalafmt.format(scalafmtConfig, Paths.get("CombinedSource.scala"), newSource.syntax)
+    println(formattedSource)
   }
 
   def transformSource(source: Source): Source = {
@@ -283,4 +289,14 @@ object ShowSourceContents {
       )
     }
   }
+
+  private def getScalafmt(): Scalafmt = {
+    Scalafmt.create(this.getClass.getClassLoader)
+  }
+
+  private def getScalafmtConfig(): Path = {
+    val uri: URI = this.getClass.getResource("/.scalafmt.conf").toURI
+    Paths.get(uri)
+  }
+
 }
