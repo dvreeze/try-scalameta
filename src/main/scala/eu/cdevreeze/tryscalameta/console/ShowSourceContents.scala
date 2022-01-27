@@ -21,6 +21,7 @@ import java.net.URI
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
+import java.nio.file.StandardCopyOption
 
 import scala.meta._
 import scala.meta.XtensionParseInputLike
@@ -61,7 +62,7 @@ object ShowSourceContents {
   def main(args: Array[String]): Unit = {
     require(args.lengthIs >= 1, s"Missing source root directories. Usage: ShowSourceContents <source root dir> ...")
 
-    val sourceDirs: Seq[Path] = args.map(arg => Paths.get(new File(arg).toURI))
+    val sourceDirs: Seq[Path] = args.toIndexedSeq.map(arg => Paths.get(new File(arg).toURI))
     require(sourceDirs.forall(dir => Files.isDirectory(dir)), s"Not all passed paths are (source) directory paths")
 
     val sources: Seq[SourceWithPath] = {
@@ -295,8 +296,14 @@ object ShowSourceContents {
   }
 
   private def getScalafmtConfig(): Path = {
-    val uri: URI = this.getClass.getResource("/.scalafmt.conf").toURI
-    Paths.get(uri)
+    val tempFilePath: Path = Files.createTempFile("scalafmt-", ".conf")
+    // Works in a (JAR) ZIP file as well
+    Files.copy(
+      ClassLoader.getSystemResourceAsStream("scalafmt.conf"),
+      tempFilePath,
+      StandardCopyOption.REPLACE_EXISTING
+    )
+    tempFilePath
   }
 
 }
