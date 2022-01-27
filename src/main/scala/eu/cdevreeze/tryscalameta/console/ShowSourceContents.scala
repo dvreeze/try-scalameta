@@ -61,7 +61,17 @@ object ShowSourceContents {
   def main(args: Array[String]): Unit = {
     require(args.lengthIs >= 1, s"Missing source root directories. Usage: ShowSourceContents <source root dir> ...")
 
+    val scalafmt: Scalafmt = getScalafmt
+    val scalafmtConfig: Path = getScalafmtConfig
+
     val sourceDirs: Seq[Path] = args.toIndexedSeq.map(arg => Paths.get(new File(arg).toURI))
+    val source: String = generateSourceContents(sourceDirs, scalafmt, scalafmtConfig)
+
+    println(source)
+  }
+
+  def generateSourceContents(sourceDirs: Seq[Path], scalafmt: Scalafmt, scalafmtConfig: Path): String = {
+    require(sourceDirs.nonEmpty, s"Missing source directory/directories")
     require(sourceDirs.forall(dir => Files.isDirectory(dir)), s"Not all passed paths are (source) directory paths")
 
     val sources: Seq[SourceWithPath] = {
@@ -77,7 +87,7 @@ object ShowSourceContents {
 
     val newSources: Seq[SourceWithPath] = transformSources(sources)
 
-    def removeRhs(tree: Tree): Tree = tree.transform { case t: Term.Assign => t.copy(rhs = rhsPlaceholder) }
+    def removeAssignRhs(tree: Tree): Tree = tree.transform { case t: Term.Assign => t.copy(rhs = rhsPlaceholder) }
 
     val newSource: Source = Source(stats =
       List(
@@ -88,17 +98,15 @@ object ShowSourceContents {
             early = Nil,
             inits = Nil,
             self = emptySelf,
-            stats = newSources.map(addCommentsAsAnnots).flatMap(_.stats).map(removeRhs(_).asInstanceOf[Stat]).toList
+            stats =
+              newSources.map(addCommentsAsAnnots).flatMap(_.stats).map(removeAssignRhs(_).asInstanceOf[Stat]).toList
           )
         )
       )
     )
 
-    val scalafmt: Scalafmt = getScalafmt
-    val scalafmtConfig: Path = getScalafmtConfig
-
     val formattedSource: String = scalafmt.format(scalafmtConfig, Paths.get("CombinedSource.scala"), newSource.syntax)
-    println(formattedSource)
+    formattedSource
   }
 
   def transformSource(source: Source): Source = {
