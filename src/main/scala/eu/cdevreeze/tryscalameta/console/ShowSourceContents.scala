@@ -17,7 +17,6 @@
 package eu.cdevreeze.tryscalameta.console
 
 import java.io.File
-import java.net.URI
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
@@ -95,8 +94,8 @@ object ShowSourceContents {
       )
     )
 
-    val scalafmt: Scalafmt = getScalafmt()
-    val scalafmtConfig: Path = getScalafmtConfig()
+    val scalafmt: Scalafmt = getScalafmt
+    val scalafmtConfig: Path = getScalafmtConfig
 
     val formattedSource: String = scalafmt.format(scalafmtConfig, Paths.get("CombinedSource.scala"), newSource.syntax)
     println(formattedSource)
@@ -291,11 +290,11 @@ object ShowSourceContents {
     }
   }
 
-  private def getScalafmt(): Scalafmt = {
+  private def getScalafmt: Scalafmt = {
     Scalafmt.create(this.getClass.getClassLoader)
   }
 
-  private def getScalafmtConfig(): Path = {
+  private def getScalafmtConfig: Path = {
     val tempFilePath: Path = Files.createTempFile("scalafmt-", ".conf")
     // Works in a (JAR) ZIP file as well
     Files.copy(
