@@ -59,18 +59,24 @@ object ShowSourceContents {
   }
 
   def main(args: Array[String]): Unit = {
-    require(args.lengthIs >= 1, s"Missing source root directories. Usage: ShowSourceContents <source root dir> ...")
+    require(args.lengthIs >= 2, s"Usage: ShowSourceContents <output source name> <source root dir> ...")
 
     val scalafmt: Scalafmt = getScalafmt
     val scalafmtConfig: Path = getScalafmtConfig
 
-    val sourceDirs: Seq[Path] = args.toIndexedSeq.map(arg => Paths.get(new File(arg).toURI))
-    val source: String = generateSourceContents(sourceDirs, scalafmt, scalafmtConfig)
+    val sourceName: String = args(0)
+    val sourceDirs: Seq[Path] = args.toIndexedSeq.drop(1).map(arg => Paths.get(new File(arg).toURI))
+    val source: String = generateSourceContents(sourceName, sourceDirs, scalafmt, scalafmtConfig)
 
     println(source)
   }
 
-  def generateSourceContents(sourceDirs: Seq[Path], scalafmt: Scalafmt, scalafmtConfig: Path): String = {
+  def generateSourceContents(
+      sourceName: String,
+      sourceDirs: Seq[Path],
+      scalafmt: Scalafmt,
+      scalafmtConfig: Path
+  ): String = {
     require(sourceDirs.nonEmpty, s"Missing source directory/directories")
     require(sourceDirs.forall(dir => Files.isDirectory(dir)), s"Not all passed paths are (source) directory paths")
 
@@ -93,7 +99,7 @@ object ShowSourceContents {
       List(
         Defn.Object(
           mods = Nil,
-          name = Term.Name("CombinedSource"),
+          name = Term.Name(sourceName),
           templ = Template(
             early = Nil,
             inits = Nil,
@@ -105,7 +111,7 @@ object ShowSourceContents {
       )
     )
 
-    val formattedSource: String = scalafmt.format(scalafmtConfig, Paths.get("CombinedSource.scala"), newSource.syntax)
+    val formattedSource: String = scalafmt.format(scalafmtConfig, Paths.get(s"$sourceName.scala"), newSource.syntax)
     formattedSource
   }
 

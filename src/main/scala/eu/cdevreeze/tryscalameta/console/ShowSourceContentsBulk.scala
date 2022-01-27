@@ -85,6 +85,8 @@ object ShowSourceContentsBulk {
 
     println(s"Processing 'project' '${inputProjectDir.getFileName}'")
 
+    val sourceName: String = inputProjectDir.getFileName.toString.split('-').toIndexedSeq.map(_.capitalize).mkString
+
     val sourceDirs: Seq[Path] =
       relativeSourceDirs.map(d => inputProjectDir.resolve(d)).filter(d => Files.isDirectory(d))
 
@@ -93,9 +95,10 @@ object ShowSourceContentsBulk {
       None
     } else {
       Try {
-        val generatedSource: String = ShowSourceContents.generateSourceContents(sourceDirs, scalafmt, scalafmtConfig)
+        val generatedSource: String =
+          ShowSourceContents.generateSourceContents(sourceName, sourceDirs, scalafmt, scalafmtConfig)
 
-        println(s"\tGenerated output source (${generatedSource.length} characters)")
+        println(s"\tGenerated output source $sourceName.scala (${generatedSource.length} characters)")
 
         val projectDirName: Path = inputProjectDir.getFileName
         val projectOutputDir: Path = Files.createDirectories(outputDir.resolve(projectDirName))
