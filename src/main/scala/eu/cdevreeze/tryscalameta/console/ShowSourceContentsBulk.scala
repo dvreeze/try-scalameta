@@ -105,7 +105,7 @@ object ShowSourceContentsBulk {
 
         Files
           .write(
-            projectOutputDir.resolve(Paths.get("CombinedSource.scala")),
+            projectOutputDir.resolve(Paths.get(s"$sourceName.scala")),
             generatedSource.getBytes(StandardCharsets.UTF_8),
             StandardOpenOption.CREATE
           )
