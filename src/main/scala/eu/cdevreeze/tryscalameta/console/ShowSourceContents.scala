@@ -299,7 +299,7 @@ object ShowSourceContents {
     val tempFilePath: Path = Files.createTempFile("scalafmt-", ".conf")
     // Works in a (JAR) ZIP file as well
     Files.copy(
-      ClassLoader.getSystemResourceAsStream("scalafmt.conf"),
+      getClass.getClassLoader.getResourceAsStream("scalafmt.conf"),
       tempFilePath,
       StandardCopyOption.REPLACE_EXISTING
     )
