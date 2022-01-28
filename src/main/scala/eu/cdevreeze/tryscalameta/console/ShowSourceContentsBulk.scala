@@ -25,8 +25,6 @@ import java.nio.file.StandardCopyOption
 import java.nio.file.StandardOpenOption
 
 import scala.jdk.StreamConverters.StreamHasToScala
-import scala.meta.Source
-import scala.meta.XtensionParseInputLike
 import scala.util.Try
 import scala.util.Using
 import scala.util.chaining.scalaUtilChainingOps
@@ -91,7 +89,7 @@ object ShowSourceContentsBulk {
       relativeSourceDirs.map(d => inputProjectDir.resolve(d)).filter(d => Files.isDirectory(d))
 
     if (sourceDirs.isEmpty) {
-      println(s"\tNo source directories found")
+      println(s"\tNo Scala source directories found")
       None
     } else {
       Try {
@@ -112,7 +110,8 @@ object ShowSourceContentsBulk {
           .pipe(Option(_))
       }.getOrElse {
         println(
-          s"Could not create output for project ${inputProjectDir.getFileName}. Was an input not a valid Scala 2.13 source?"
+          s"Could not create output for project ${inputProjectDir.getFileName}. " +
+            "Did a package not match the directory structure? Was an input not a valid Scala 2.13 source?"
         )
         None
       }

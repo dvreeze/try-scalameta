@@ -56,6 +56,47 @@ object ShowSourceContents {
     require(absolutePath.startsWith(sourceRootDir), s"Path '$absolutePath' does not start with '$sourceRootDir'")
 
     def relativePath: Path = sourceRootDir.relativize(absolutePath)
+
+    def packageMatchesRelativePath: Boolean = {
+      val pkgs: Seq[Pkg] = source.stats.collect { case pkg: Pkg => pkg }
+      val paths: Seq[Path] = pkgs.flatMap(pkg => Pkgs.convertToPaths(pkg))
+      val relDirPath: Path = relativePath.getParent
+      paths.exists(p => relDirPath.startsWith(p)) // Keeping package objects in mind
+    }
+
+  }
+
+  private object Pkgs {
+
+    def convertToPaths(pkg: Pkg): Seq[Path] = {
+      val firstPaths: Seq[Path] = convertToPath(pkg.ref).toSeq
+
+      val nextPkgs: Seq[Pkg] = pkg.stats.collect { case subPkg: Pkg => subPkg }
+
+      if (nextPkgs.isEmpty) {
+        firstPaths
+      } else {
+        // Recursive calls
+        val nextPaths: Seq[Path] = nextPkgs.flatMap(pkg => convertToPaths(pkg))
+        firstPaths.flatMap(p1 => nextPaths.map(p2 => p1.resolve(p2)))
+      }
+    }
+
+    def convertToPath(ref: Term.Ref): Option[Path] = {
+      ref match {
+        case t: Term.Name   => Some(Paths.get(t.value))
+        case t: Term.Select =>
+          // Recursive calls
+          (t.qual match {
+            case tq: Term.Ref => convertToPath(tq)
+            case _            => None
+          }).flatMap { path =>
+            Some(path.resolve(Paths.get(t.name.value)))
+          }
+        case _ => None
+      }
+    }
+
   }
 
   def main(args: Array[String]): Unit = {
@@ -80,15 +121,22 @@ object ShowSourceContents {
     require(sourceDirs.nonEmpty, s"Missing source directory/directories")
     require(sourceDirs.forall(dir => Files.isDirectory(dir)), s"Not all passed paths are (source) directory paths")
 
-    val sources: Seq[SourceWithPath] = {
+    val unfilteredSources: Seq[SourceWithPath] = {
       sourceDirs.flatMap { sourceDir =>
-        findAllScalaSourceFiles(sourceDir).map { f =>
-          val source: Source = f.parse[Source].get
-          checkParentOfChildrenIsThis(source)
-          require(source.parent.isEmpty)
-          SourceWithPath(source, new File(f.path).toPath, sourceDir)
-        }
+        findAllScalaSourceFiles(sourceDir)
+          .map { f =>
+            val source: Source = f.parse[Source].get
+            checkParentOfChildrenIsThis(source)
+            require(source.parent.isEmpty)
+            SourceWithPath(source, new File(f.path).toPath, sourceDir)
+          }
       }
+    }
+
+    val sources: Seq[SourceWithPath] = unfilteredSources.filter(_.packageMatchesRelativePath)
+
+    if (sources.sizeIs < unfilteredSources.size) {
+      sys.error(s"Discrepancy between the package of at least one source and the relative file name")
     }
 
     val newSources: Seq[SourceWithPath] = transformSources(sources)
