@@ -38,6 +38,11 @@ import org.scalafmt.interfaces.Scalafmt
  * scalameta, but would not compile. The output has been prettified by Scalafmt, using the Scalafmt config file on the
  * classpath. The result is best shown in an editor with syntax highlighting or in an IDE.
  *
+ * The RHS terms of val and var definitions may occur completely or partly in the output, depending on their structure
+ * and number of nodes in the syntax tree. The latter must not be greater than system property
+ * "maxNodesInSimplifiedTerm", or else the RHS in the output will be "???". The default value of
+ * "maxNodesInSimplifiedTerm" is 10.
+ *
  * @author
  *   Chris de Vreeze
  */
@@ -45,10 +50,10 @@ object ShowSourceContents {
 
   private val emptySelf: Self = Self(Name.Anonymous(), None)
 
-  private val maxNodesInSimplifiedTerm: Int = 8
+  private val maxNodesInSimplifiedTerm: Int = sys.props.getOrElse("maxNodesInSimplifiedTerm", "10").toInt
 
   private val termPlaceholder: Term.Name = Term.Name("???")
-  private val typeBodyPlaceholder: Type.Name = Type.Name("Some__Type")
+  private val typePlaceholder: Type.Name = Type.Name("Some__Type")
 
   private final case class SourceWithPath(source: Source, absolutePath: Path, sourceRootDir: Path) {
     require(Files.isDirectory(sourceRootDir), s"Not a directory: '$sourceRootDir")
@@ -262,7 +267,7 @@ object ShowSourceContents {
   }
 
   private def transformTypeDefn(defn: Defn.Type): Defn.Type = {
-    defn.copy(body = typeBodyPlaceholder)
+    defn.copy(body = typePlaceholder)
   }
 
   private def transformTypeDecl(decl: Decl.Type): Decl.Type = {
@@ -316,16 +321,41 @@ object ShowSourceContents {
 
   private def simplifyTerm(term: Term): Term = {
     (term match {
-      case term: Lit         => term
-      case term: Term.Name   => term
-      case term: Term.Select => Term.Select(qual = simplifyTerm(term.qual), name = term.name)
-      case term: Term.Apply  => term.copy(fun = simplifyTerm(term.fun), args = term.args.map(simplifyTerm))
-      case term: Term.Assign => term.copy(lhs = simplifyTerm(term.lhs), rhs = simplifyTerm(term.rhs))
-      case _                 => termPlaceholder
+      case term: Lit             => term
+      case term: Term.Name       => term
+      case term: Term.Select     => Term.Select(qual = simplifyTerm(term.qual), name = term.name)
+      case term: Term.Apply      => term.copy(fun = simplifyTerm(term.fun), args = term.args.map(simplifyTerm))
+      case term: Term.ApplyUnary => term.copy(arg = simplifyTerm(term.arg))
+      case term: Term.Assign     => term.copy(lhs = simplifyTerm(term.lhs), rhs = simplifyTerm(term.rhs))
+      case term: Term.Eta        => Term.Eta(simplifyTerm(term.expr))
+      case term: Term.ApplyType  => term.copy(fun = simplifyTerm(term.fun), targs = term.targs.map(simplifyType))
+      case term: Term.If =>
+        term.copy(cond = simplifyTerm(term.cond), thenp = simplifyTerm(term.thenp), elsep = simplifyTerm(term.elsep))
+      case term: Term.Super => term
+      case term: Term.This  => term
+      case term: Term.New =>
+        term.copy(init = term.init.pipe { init =>
+          init.copy(
+            tpe = simplifyType(init.tpe),
+            name = init.name,
+            argss = init.argss.map(args => args.map(simplifyTerm))
+          )
+        })
+      case term: Term.Throw => term.copy(expr = simplifyTerm(term.expr))
+      case term: Term.Tuple => term.copy(args = term.args.map(simplifyTerm))
+      case _                => termPlaceholder
     })
       .pipe { t =>
         if (t.findAllDescendantsOrSelf[Term]().sizeIs <= maxNodesInSimplifiedTerm) t else termPlaceholder
       }
+  }
+
+  private def simplifyType(tpe: Type): Type = {
+    tpe match {
+      case tpe: Lit       => tpe
+      case tpe: Type.Name => tpe
+      case _              => typePlaceholder
+    }
   }
 
   private def isDefnOrDecl(stat: Stat): Boolean = stat match {
