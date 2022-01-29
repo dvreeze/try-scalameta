@@ -36,8 +36,7 @@ import org.scalafmt.interfaces.Scalafmt
  * (per Scala source) is conceptually a bit javap-like (using defaults), such that only public members are shown and
  * that method implementations are left out. The output looks like valid Scala, and is indeed syntactically parseable by
  * scalameta, but would not compile. The output has been prettified by Scalafmt, using the Scalafmt config file on the
- * classpath. The result is best shown in an editor with syntax highlighting (but without showing compilation errors),
- * such as gedit.
+ * classpath. The result is best shown in an editor with syntax highlighting or in an IDE.
  *
  * @author
  *   Chris de Vreeze
@@ -46,8 +45,9 @@ object ShowSourceContents {
 
   private val emptySelf: Self = Self(Name.Anonymous(), None)
 
-  private val bodyPlaceholder: Term.Name = Term.Name("???")
-  private val rhsPlaceholder: Term.Name = Term.Name("???")
+  private val maxNodesInSimplifiedTerm: Int = 8
+
+  private val termPlaceholder: Term.Name = Term.Name("???")
   private val typeBodyPlaceholder: Type.Name = Type.Name("Some__Type")
 
   private final case class SourceWithPath(source: Source, absolutePath: Path, sourceRootDir: Path) {
@@ -136,12 +136,10 @@ object ShowSourceContents {
     val sources: Seq[SourceWithPath] = unfilteredSources.filter(_.packageMatchesRelativePath)
 
     if (sources.sizeIs < unfilteredSources.size) {
-      sys.error(s"Discrepancy between the package of at least one source and the relative file name")
+      sys.error(s"Discrepancy between the package of at least one source and the relative directory structure")
     }
 
     val newSources: Seq[SourceWithPath] = transformSources(sources)
-
-    def removeAssignRhs(tree: Tree): Tree = tree.transform { case t: Term.Assign => t.copy(rhs = rhsPlaceholder) }
 
     val newSource: Source = Source(stats =
       List(
@@ -152,8 +150,7 @@ object ShowSourceContents {
             early = Nil,
             inits = Nil,
             self = emptySelf,
-            stats =
-              newSources.map(addCommentsAsAnnots).flatMap(_.stats).map(removeAssignRhs(_).asInstanceOf[Stat]).toList
+            stats = newSources.map(addCommentsAsAnnots).flatMap(_.stats).toList
           )
         )
       )
@@ -164,8 +161,8 @@ object ShowSourceContents {
   }
 
   def transformSource(source: Source): Source = {
-    // Note that a statement is either a definition, declaration, term or import. Here the latter two are ignored.
-    // Note that we must also go inside packages (which are statements themselves), and not stop there.
+    // Note that a (non-package) statement is either a definition, declaration, term or import. Here the latter two are ignored.
+    // Note that we must also go inside packages (which are statements themselves), and not stop at the packages.
     val newStats: List[Stat] = {
       source.stats.flatMap(_.findTopmostOrSelf[Stat](isDefnOrDecl)).flatMap {
         case defn: Defn => optionallyTransformDefn(defn)
@@ -252,16 +249,16 @@ object ShowSourceContents {
 
   private def transformDefDefn(defn: Defn.Def): Defn.Def = {
     defn
-      .copy(body = bodyPlaceholder, mods = removeThrowsAnnot(defn.mods))
+      .copy(body = termPlaceholder, mods = removeThrowsAnnot(defn.mods))
       .pipe(removeDefaultArgs)
   }
 
   private def transformValDefn(defn: Defn.Val): Defn.Val = {
-    defn.copy(rhs = rhsPlaceholder)
+    defn.copy(rhs = simplifyTerm(defn.rhs))
   }
 
   private def transformVarDefn(defn: Defn.Var): Defn.Var = {
-    defn.copy(rhs = Some(rhsPlaceholder))
+    defn.copy(rhs = defn.rhs.map(simplifyTerm))
   }
 
   private def transformTypeDefn(defn: Defn.Type): Defn.Type = {
@@ -315,6 +312,20 @@ object ShowSourceContents {
         Init(tpe = Type.Name("comment"), name = Name.Anonymous(), argss = List(List(Lit.String(comment))))
       )
     )
+  }
+
+  private def simplifyTerm(term: Term): Term = {
+    (term match {
+      case term: Lit         => term
+      case term: Term.Name   => term
+      case term: Term.Select => Term.Select(qual = simplifyTerm(term.qual), name = term.name)
+      case term: Term.Apply  => term.copy(fun = simplifyTerm(term.fun), args = term.args.map(simplifyTerm))
+      case term: Term.Assign => term.copy(lhs = simplifyTerm(term.lhs), rhs = simplifyTerm(term.rhs))
+      case _                 => termPlaceholder
+    })
+      .pipe { t =>
+        if (t.findAllDescendantsOrSelf[Term]().sizeIs <= maxNodesInSimplifiedTerm) t else termPlaceholder
+      }
   }
 
   private def isDefnOrDecl(stat: Stat): Boolean = stat match {
