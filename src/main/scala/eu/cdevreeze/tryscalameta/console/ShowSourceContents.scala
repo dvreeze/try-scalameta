@@ -40,8 +40,9 @@ import org.scalafmt.interfaces.Scalafmt
  *
  * The RHS terms of val and var definitions may occur completely or partly in the output, depending on their structure
  * and number of nodes in the syntax tree. The latter must not be greater than system property
- * "maxNodesInSimplifiedTerm", or else the RHS in the output will be "???". The default value of
- * "maxNodesInSimplifiedTerm" is 10.
+ * "maxNodesInSimplifiedTree", or else the RHS in the output will be "???". The default value of
+ * "maxNodesInSimplifiedTree" is 10. Similar remarks apply to the RHS types of type definitions, where the same system
+ * property is used.
  *
  * @author
  *   Chris de Vreeze
@@ -50,10 +51,12 @@ object ShowSourceContents {
 
   private val emptySelf: Self = Self(Name.Anonymous(), None)
 
-  private val maxNodesInSimplifiedTerm: Int = sys.props.getOrElse("maxNodesInSimplifiedTerm", "10").toInt
+  private val maxNodesInSimplifiedTree: Int = sys.props.getOrElse("maxNodesInSimplifiedTree", "10").toInt
+  private val makeDefBodiesEmpty: Boolean = sys.props.getOrElse("makeDefBodiesEmpty", "true").toBoolean
 
   private val termPlaceholder: Term.Name = Term.Name("???")
   private val typePlaceholder: Type.Name = Type.Name("Some__Type")
+  private val templatePlaceholder: Template = Template(Nil, Nil, emptySelf, Nil)
 
   private final case class SourceWithPath(source: Source, absolutePath: Path, sourceRootDir: Path) {
     require(Files.isDirectory(sourceRootDir), s"Not a directory: '$sourceRootDir")
@@ -253,8 +256,9 @@ object ShowSourceContents {
   }
 
   private def transformDefDefn(defn: Defn.Def): Defn.Def = {
+    val body: Term = if (makeDefBodiesEmpty) termPlaceholder else simplifyTerm(defn.body)
     defn
-      .copy(body = termPlaceholder, mods = removeThrowsAnnot(defn.mods))
+      .copy(body = body, mods = removeThrowsAnnot(defn.mods))
       .pipe(removeDefaultArgs)
   }
 
@@ -267,7 +271,7 @@ object ShowSourceContents {
   }
 
   private def transformTypeDefn(defn: Defn.Type): Defn.Type = {
-    defn.copy(body = typePlaceholder)
+    defn.copy(body = simplifyType(defn.body))
   }
 
   private def transformTypeDecl(decl: Decl.Type): Decl.Type = {
@@ -319,42 +323,27 @@ object ShowSourceContents {
     )
   }
 
+  private def simplifyTree(tree: Tree): Tree = {
+    // Recursive top-down tree simplification, avoiding infinite recursion
+    tree.transform {
+      case _: Term.Block | _: Term.Do | _: Term.For | _: Term.ForYield | _: Term.Match | _: Term.While =>
+        termPlaceholder
+      case _: Type.Match => typePlaceholder
+      case _: Template   => templatePlaceholder
+    }
+  }
+
   private def simplifyTerm(term: Term): Term = {
-    (term match {
-      case term: Lit             => term
-      case term: Term.Name       => term
-      case term: Term.Select     => Term.Select(qual = simplifyTerm(term.qual), name = term.name)
-      case term: Term.Apply      => term.copy(fun = simplifyTerm(term.fun), args = term.args.map(simplifyTerm))
-      case term: Term.ApplyUnary => term.copy(arg = simplifyTerm(term.arg))
-      case term: Term.Assign     => term.copy(lhs = simplifyTerm(term.lhs), rhs = simplifyTerm(term.rhs))
-      case term: Term.Eta        => Term.Eta(simplifyTerm(term.expr))
-      case term: Term.ApplyType  => term.copy(fun = simplifyTerm(term.fun), targs = term.targs.map(simplifyType))
-      case term: Term.If =>
-        term.copy(cond = simplifyTerm(term.cond), thenp = simplifyTerm(term.thenp), elsep = simplifyTerm(term.elsep))
-      case term: Term.Super => term
-      case term: Term.This  => term
-      case term: Term.New =>
-        term.copy(init = term.init.pipe { init =>
-          init.copy(
-            tpe = simplifyType(init.tpe),
-            name = init.name,
-            argss = init.argss.map(args => args.map(simplifyTerm))
-          )
-        })
-      case term: Term.Throw => term.copy(expr = simplifyTerm(term.expr))
-      case term: Term.Tuple => term.copy(args = term.args.map(simplifyTerm))
-      case _                => termPlaceholder
-    })
-      .pipe { t =>
-        if (t.findAllDescendantsOrSelf[Term]().sizeIs <= maxNodesInSimplifiedTerm) t else termPlaceholder
-      }
+    simplifyTree(term).pipe { t =>
+      if (t.findAllDescendantsOrSelf[Tree]().sizeIs <= maxNodesInSimplifiedTree) t.asInstanceOf[Term]
+      else termPlaceholder
+    }
   }
 
   private def simplifyType(tpe: Type): Type = {
-    tpe match {
-      case tpe: Lit       => tpe
-      case tpe: Type.Name => tpe
-      case _              => typePlaceholder
+    simplifyTree(tpe).pipe { t =>
+      if (t.findAllDescendantsOrSelf[Tree]().sizeIs <= maxNodesInSimplifiedTree) t.asInstanceOf[Type]
+      else typePlaceholder
     }
   }
 
