@@ -336,9 +336,12 @@ object ShowSourceContents {
           termPlaceholder
         case _: Term.Do | _: Term.For | _: Term.ForYield | _: Term.Match | _: Term.While =>
           termPlaceholder
-        case _: Type.Match => typePlaceholder
-        case _: Template   => templatePlaceholder
-        case node          => super.apply(node)
+        case _: Type.Match     => typePlaceholder
+        case _: Template       => templatePlaceholder
+        case t: Name.Anonymous => t
+        case t: Term.Name      => t
+        case t: Type.Name      => t
+        case node              => super.apply(node)
       }
     }
     transformer(tree)
