@@ -53,6 +53,7 @@ object ShowSourceContents {
 
   private val maxNodesInSimplifiedTree: Int = sys.props.getOrElse("maxNodesInSimplifiedTree", "10").toInt
   private val makeDefBodiesEmpty: Boolean = sys.props.getOrElse("makeDefBodiesEmpty", "true").toBoolean
+  private val checkPackagesAgainstDirs: Boolean = sys.props.getOrElse("checkPackagesAgainstDirs", "true").toBoolean
 
   private val termPlaceholder: Term.Name = Term.Name("???")
   private val typePlaceholder: Type.Name = Type.Name("Some__Type")
@@ -150,7 +151,7 @@ object ShowSourceContents {
 
     val sources: Seq[SourceWithPath] = unfilteredSources.filter(_.packageMatchesRelativePath)
 
-    if (sources.sizeIs < unfilteredSources.size) {
+    if (checkPackagesAgainstDirs && sources.sizeIs < unfilteredSources.size) {
       throw new PackageDirectoryMismatchException(
         s"Discrepancy between the package of at least one source and the relative directory structure" +
           s" (e.g. at relative path ${unfilteredSources.filterNot(sources.toSet).head.relativePath})"
