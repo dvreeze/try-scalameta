@@ -112,6 +112,8 @@ object ShowSourceContents {
 
   }
 
+  final class PackageDirectoryMismatchException(msg: String) extends RuntimeException(msg)
+
   def main(args: Array[String]): Unit = {
     require(args.lengthIs >= 2, s"Usage: ShowSourceContents <output source name> <source root dir> ...")
 
@@ -149,7 +151,10 @@ object ShowSourceContents {
     val sources: Seq[SourceWithPath] = unfilteredSources.filter(_.packageMatchesRelativePath)
 
     if (sources.sizeIs < unfilteredSources.size) {
-      sys.error(s"Discrepancy between the package of at least one source and the relative directory structure")
+      throw new PackageDirectoryMismatchException(
+        s"Discrepancy between the package of at least one source and the relative directory structure" +
+          s" (e.g. at relative path ${unfilteredSources.filterNot(sources.toSet).head.relativePath})"
+      )
     }
 
     val newSources: Seq[SourceWithPath] = transformSources(sources)
@@ -338,9 +343,9 @@ object ShowSourceContents {
           termPlaceholder
         case _: Type.Match     => typePlaceholder
         case _: Template       => templatePlaceholder
-        case t: Name.Anonymous => t
+        case t: Name.Anonymous => t // Apparently needed, to avoid infinite recursion
         case t: Term.Name      => t
-        case t: Type.Name      => t
+        case t: Type.Name      => t // Apparently needed, to avoid infinite recursion
         case node              => super.apply(node)
       }
     }

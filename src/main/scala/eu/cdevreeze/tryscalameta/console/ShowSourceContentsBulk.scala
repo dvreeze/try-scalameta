@@ -108,6 +108,9 @@ object ShowSourceContentsBulk {
             StandardOpenOption.CREATE
           )
           .pipe(Option(_))
+      }.recover { case e: ShowSourceContents.PackageDirectoryMismatchException =>
+        println(s"Could not create output for project ${inputProjectDir.getFileName}. " + e.getMessage)
+        None
       }.getOrElse {
         println(
           s"Could not create output for project ${inputProjectDir.getFileName}. " +
