@@ -67,9 +67,14 @@ object ShowSourceContents {
 
     def packageMatchesRelativePath: Boolean = {
       val pkgs: Seq[Pkg] = source.stats.collect { case pkg: Pkg => pkg }
-      val paths: Seq[Path] = pkgs.flatMap(pkg => Pkgs.convertToPaths(pkg))
-      val relDirPath: Path = relativePath.getParent
-      paths.exists(p => relDirPath.startsWith(p)) // Keeping package objects in mind
+
+      if (pkgs.isEmpty) {
+        true // Easy way out. Not checking for source without package.
+      } else {
+        val paths: Seq[Path] = pkgs.flatMap(pkg => Pkgs.convertToPaths(pkg))
+        val relDirPath: Path = relativePath.getParent
+        paths.exists(p => relDirPath.startsWith(p)) // Keeping package objects in mind
+      }
     }
 
   }
@@ -333,7 +338,7 @@ object ShowSourceContents {
           termPlaceholder
         case _: Type.Match => typePlaceholder
         case _: Template   => templatePlaceholder
-        case node => super.apply(node)
+        case node          => super.apply(node)
       }
     }
     transformer(tree)
