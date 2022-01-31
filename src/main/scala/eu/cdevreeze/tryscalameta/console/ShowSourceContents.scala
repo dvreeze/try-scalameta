@@ -325,14 +325,18 @@ object ShowSourceContents {
 
   private def simplifyTree(tree: Tree): Tree = {
     // Recursive top-down tree simplification, avoiding infinite recursion
-    tree.transform {
-      case t: Term.Block if t.stats.sizeIs >= 2 =>
-        termPlaceholder
-      case _: Term.Do | _: Term.For | _: Term.ForYield | _: Term.Match | _: Term.While =>
-        termPlaceholder
-      case _: Type.Match => typePlaceholder
-      case _: Template   => templatePlaceholder
+    val transformer: Transformer = new Transformer {
+      override def apply(tree: Tree): Tree = tree match {
+        case t: Term.Block if t.stats.sizeIs >= 2 =>
+          termPlaceholder
+        case _: Term.Do | _: Term.For | _: Term.ForYield | _: Term.Match | _: Term.While =>
+          termPlaceholder
+        case _: Type.Match => typePlaceholder
+        case _: Template   => templatePlaceholder
+        case node => super.apply(node)
+      }
     }
+    transformer(tree)
   }
 
   private def simplifyTerm(term: Term): Term = {
