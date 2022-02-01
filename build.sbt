@@ -11,6 +11,9 @@ ThisBuild / versionScheme := Some("strict")
 ThisBuild / scalaVersion       := scalaVer
 ThisBuild / crossScalaVersions := crossScalaVer
 
+ThisBuild / semanticdbEnabled := true // enable SemanticDB
+ThisBuild / semanticdbVersion := scalafixSemanticdb.revision // only required for Scala 2.x
+
 ThisBuild / scalacOptions ++= Seq("-Wconf:cat=unused-imports:w,cat=unchecked:w,cat=deprecation:w,cat=feature:w,cat=lint:w")
 
 ThisBuild / publishMavenStyle := true
@@ -39,6 +42,8 @@ ThisBuild / libraryDependencies += "com.typesafe" % "config" % "1.4.1"
 ThisBuild / libraryDependencies += "org.scalameta" % "scalafmt-interfaces" % "3.3.3"
 
 ThisBuild / libraryDependencies += "org.scalameta" %% "scalafmt-dynamic" % "3.3.3"
+
+ThisBuild / libraryDependencies += "ch.epfl.scala" %% "scalafix-rules" % "0.9.34"
 
 ThisBuild / libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.10" % Test
 

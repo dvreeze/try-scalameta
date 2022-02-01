@@ -32,3 +32,5 @@ addSbtPlugin("ch.epfl.scala" % "sbt-missinglink" % "0.3.2")
 // Tasks: checkDuplicates, checkDuplicatesTest
 addSbtPlugin("com.github.sbt" % "sbt-duplicates-finder" % "1.1.0")
 
+// See https://scalacenter.github.io/scalafix/docs/users/installation.html
+addSbtPlugin("ch.epfl.scala" % "sbt-scalafix" % "0.9.34")
