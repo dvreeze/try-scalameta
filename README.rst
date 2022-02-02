@@ -158,14 +158,35 @@ there are also tools like *metacp* and *mtags* that currently I do not know anyt
 Using SemanticDB models
 =======================
 
-TODO
+Let's compare the Scalameta Tree API and the SemanticDB data model with specific
+`phases of the Scala compiler`_. The syntactic Tree model can be compared to the output of the first compilation
+phase, namely the *parser phase*. At this point the compiler would know about the structure of the
+program, without any context. After this phase, function definitions and function calls are recognized,
+for example, but the compiler does not yet know how to relate them to each other. The SemanticDB
+model can be compared to the output of the *typer phase*. At that point, function calls can
+be related to function definitions, to the extent that the compiler can know about this.
+Without knowing anything about the Scala compiler, it seems that the phases after the typer
+phase mostly prepare generation of executable code (class files). Although I can see the need
+for `TASTy`_, I'm not sure where TASTy output generation fits in the almost 25 compilation phases.
+
+It makes sense to spend some time reading the `SemanticDB Specification`_. First it is important
+to get a feel for the terminology, like (typed) Tree, Symbol, Type, SymbolInformation, etc.
+When tree nodes have symbols attached to them, we can relate references to definitions, having the
+same symbol attached to them. Then it makes sense to read this specification in more detail,
+and using it as reference material when using SemanticDB.
+
+One relatively easy way to use SemanticDB models in static code analysis tasks is to do so
+via `Scalafix`_, even if Scalafix is not used for refactoring or linting. Still, Scalafix can be handy, because it
+supports the SemanticDB model well in its API, and it takes many of the "bootstrapping challenges"
+away. See also the `Scalafix API Overview`_. Many Scalafix key data structures clearly correspond
+to SemanticDB concepts, e.g. symbols and symbol information.
 
 Conclusion
 ==========
 
 It is hoped that this project can help in quickly scripting some Scala code analysis, using Ammonite
 REPL sessions or Scalafix rules. Some of the code in this project could first be copied into
-those REPL sessions.
+those REPL sessions, or can be used for inspiration.
 
 .. _`Scalameta`: https://scalameta.org
 .. _`Tree API`: https://scalameta.org/docs/trees/guide.html
@@ -179,3 +200,8 @@ those REPL sessions.
 .. _`sbt`: https://www.scala-sbt.org/
 .. _`scalac`: https://docs.scala-lang.org/overviews/compiler-options/index.html
 .. _`Tree examples`: https://scalameta.org/docs/trees/examples.html
+.. _`phases of the Scala compiler`: https://docs.scala-lang.org/overviews/compiler-options/index.html#compilation-phases
+.. _`TASTy`: https://docs.scala-lang.org/scala3/guides/tasty-overview.html
+.. _`SemanticDb Specification`: https://scalameta.org/docs/semanticdb/specification.html
+.. _`Scalafix`: https://scalacenter.github.io/scalafix/docs/users/installation.html
+.. _`Scalafix API Overview`: https://scalacenter.github.io/scalafix/docs/developers/api.html
