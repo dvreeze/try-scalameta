@@ -165,15 +165,15 @@ program, without any context. After this phase, function definitions and functio
 for example, but the compiler does not yet know how to relate them to each other. The SemanticDB
 model can be compared to the output of the *typer phase*. At that point, function calls can
 be related to function definitions, to the extent that the compiler can know about this.
-Without knowing anything about the Scala compiler, it seems that the phases after the typer
-phase mostly prepare generation of executable code (class files). Although I can see the need
+Without myself knowing anything about the Scala compiler, it seems that the phases after the typer
+phase mostly prepare generation of executable code (class files). Although I can also see the need
 for `TASTy`_, I'm not sure where TASTy output generation fits in the almost 25 compilation phases.
 
 It makes sense to spend some time reading the `SemanticDB Specification`_. First it is important
 to get a feel for the terminology, like (typed) Tree, Symbol, Type, SymbolInformation, etc.
-When tree nodes have symbols attached to them, we can relate references to definitions, having the
-same symbol attached to them. Then it makes sense to read this specification in more detail,
-and using it as reference material when using SemanticDB.
+When tree nodes have symbols attached to them, we can relate references to definitions, both having the
+same symbol attached to them. After a first cursory read it makes sense to read this specification in more detail,
+and to use it as reference material when using SemanticDB.
 
 One relatively easy way to use SemanticDB models in static code analysis tasks is to do so
 via `Scalafix`_, even if Scalafix is not used for refactoring or linting. Still, Scalafix can be handy, because it
