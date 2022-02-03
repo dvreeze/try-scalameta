@@ -23,8 +23,12 @@ import scalafix.v1._
 import scala.meta._
 import scala.util.chaining.scalaUtilChainingOps
 
+import metaconfig.ConfDecoder
+import metaconfig.Configured
+import metaconfig.generic.Surface
+
 /**
- * Shows method definitions and where they are used.
+ * Shows usage of public methods whose symbols are passed as configuration data.
  *
  * This "rule" only depends on the Scala standard library and on Scalafix (and therefore Scalameta) and nothing else, so
  * this rule can easily be run from its source path. For example: "scalafix --rules=file:/path/to/ShowMethodUsage.scala"
@@ -32,40 +36,68 @@ import scala.util.chaining.scalaUtilChainingOps
  * @author
  *   Chris de Vreeze
  */
-class ShowMethodUsage extends SemanticRule("ShowMethodUsage") {
+final class ShowMethodUsage(val config: UsedMethodConfig) extends SemanticRule("ShowMethodUsage") {
+
+  def this() = this(UsedMethodConfig.default)
+
+  private case class MatchingTerm(term: Term, methodSymbol: Symbol)
+
+  override def withConfiguration(config: Configuration): Configured[Rule] =
+    config.conf
+      .getOrElse("ShowMethodUsage")(this.config)
+      .map(newConfig => new ShowMethodUsage(newConfig))
 
   override def fix(implicit doc: SemanticDocument): Patch = {
-    val publicMethodDefnSymbols: Seq[Symbol] = doc.tree
-      .collect { case t: Defn.Def =>
-        t.symbol.info.ensuring(_.forall(_.isMethod)).ensuring(_.forall(_.isDef))
+    if (config.isEmpty) {
+      println("Missing methodSymbols (symbols of methods). Doing nothing.")
+      Patch.empty
+    } else {
+      // Replacing ".." in HOCON by "#"
+      val methodSymbols: Seq[Symbol] =
+        config.methodSymbols.ensuring(_.nonEmpty).map(_.replace("..", "#")).map(Symbol.apply)
+
+      methodSymbols.foreach(checkMethodSymbol)
+
+      val matchingTerms: Seq[MatchingTerm] = doc.tree.collect {
+        case t: Term.Apply if methodSymbols.contains(t.fun.symbol) => MatchingTerm(t, t.fun.symbol)
+        case t: Term.Name if methodSymbols.contains(t.symbol)      => MatchingTerm(t, t.symbol)
       }
-      .collect { case Some(info) if info.isPublic => info.symbol }
 
-    val publicMethodCalls: Seq[Term.Apply] = doc.tree.collect { case t: Term.Apply => t }
-    val publicMethodCallsBySymbol: Map[Symbol, Seq[Term.Apply]] = publicMethodCalls.groupBy(_.fun.symbol)
+      val fileName: Path = doc.input.asInstanceOf[Input.VirtualFile].path.pipe(Paths.get(_)).getFileName
 
-    val fileName: Path = doc.input.asInstanceOf[Input.VirtualFile].path.pipe(Paths.get(_)).getFileName
-
-    println()
-    println(s"Method definitions (public) and their usage in $fileName:")
-
-    publicMethodDefnSymbols.foreach { defSymbol =>
       println()
-      println(s"Symbol: $defSymbol")
-      println(s"\tDisplay name: ${defSymbol.displayName}")
-      println(s"\tOwner: ${defSymbol.owner}")
+      println(s"Usage of methods (one of ${methodSymbols.mkString(", ")}) in file $fileName:")
 
-      val methodCalls: Seq[Term.Apply] = publicMethodCallsBySymbol.getOrElse(defSymbol, Seq.empty)
-
-      methodCalls.foreach { methodCall =>
-        println(s"Method call (in ${methodCall.symbol.owner}):")
-        println(s"\t${methodCall.syntax}")
+      if (matchingTerms.isEmpty) {
+        println("No usage found")
+      } else {
+        matchingTerms.foreach { case MatchingTerm(term, methodSymbol) =>
+          println()
+          println(s"Usage of method $methodSymbol:")
+          println(s"Term class name: ${term.getClass.getSimpleName}")
+          println(s"Syntax: ${term.syntax}")
+          println(s"Display name: ${term.symbol.displayName}")
+          println(s"Owner: ${term.symbol.owner}")
+        }
       }
+
+      Patch.empty
     }
-
-    // TODO Turn this program into something useful
-
-    Patch.empty
   }
 
+  private def checkMethodSymbol(sym: Symbol)(implicit doc: SemanticDocument): Unit = {
+    require(sym.info.forall(_.isMethod), s"Not a method: $sym")
+    require(sym.info.forall(_.isPublic), s"Not a public method: $sym")
+  }
+
+}
+
+final case class UsedMethodConfig(methodSymbols: List[String] = Nil) {
+  def isEmpty: Boolean = methodSymbols.isEmpty
+}
+
+object UsedMethodConfig {
+  val default: UsedMethodConfig = UsedMethodConfig()
+  implicit val surface: Surface[UsedMethodConfig] = metaconfig.generic.deriveSurface[UsedMethodConfig]
+  implicit val decoder: ConfDecoder[UsedMethodConfig] = metaconfig.generic.deriveDecoder(default)
 }

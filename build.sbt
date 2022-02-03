@@ -37,13 +37,13 @@ ThisBuild / pomIncludeRepository := { _ => false }
 
 ThisBuild / libraryDependencies += "org.scalameta" %% "scalameta" % "4.4.33"
 
-ThisBuild / libraryDependencies += "com.typesafe" % "config" % "1.4.1"
-
 ThisBuild / libraryDependencies += "org.scalameta" % "scalafmt-interfaces" % "3.3.3"
 
 ThisBuild / libraryDependencies += "org.scalameta" %% "scalafmt-dynamic" % "3.3.3"
 
 ThisBuild / libraryDependencies += "ch.epfl.scala" %% "scalafix-rules" % "0.9.34"
+
+ThisBuild / libraryDependencies += "com.geirsson" %% "metaconfig-typesafe-config" % "0.10.0"
 
 ThisBuild / libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.10" % Test
 
