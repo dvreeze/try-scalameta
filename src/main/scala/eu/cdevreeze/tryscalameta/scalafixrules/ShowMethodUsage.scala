@@ -41,7 +41,7 @@ import metaconfig.generic.Surface
  *
  * To run this semantic rule, first make sure that the Scala compiler has emitted "*.semanticdb" files. See for example
  * https://scalacenter.github.io/scalafix/docs/users/installation.html for sbt, and
- * https://github.com/evis/scalafix-maven-plugin for Maven. Just the semanticdb-scalac compiler plugin configuration is
+ * https://github.com/evis/scalafix-maven-plugin for Maven. Only the semanticdb-scalac compiler plugin configuration is
  * needed, if scalafix is run directly from the command line. Just don't forget to compile first before running the
  * semantic "rule", or else it misses the needed "*.semanticdb" files as input.
  *
