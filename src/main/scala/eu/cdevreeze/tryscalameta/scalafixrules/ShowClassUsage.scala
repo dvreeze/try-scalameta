@@ -28,11 +28,11 @@ import metaconfig.Configured
 import metaconfig.generic.Surface
 
 /**
- * Shows usage of public methods whose symbols are passed as configuration data.
+ * Shows usage of public classes/traits/objects in method calls whose symbols are passed as configuration data.
  *
  * This "rule" only depends on the Scala standard library and on Scalafix (and therefore Scalameta) and nothing else, so
  * this rule can easily be run from its source path against sbt or Maven projects. For example: "scalafix
- * --rules=file:/path/to/ShowMethodUsage.scala --config=/path/to/scalafix-config-file --classpath=./target/classes"
+ * --rules=file:/path/to/ShowClassUsage.scala --config=/path/to/scalafix-config-file --classpath=./target/classes"
  *
  * The classpath configuration option should point to the parent directory of a "META-INF/semanticdb/src/main/scala"
  * directory, where the "*.scala.semanticdb" files live.
@@ -50,48 +50,49 @@ import metaconfig.generic.Surface
  * @author
  *   Chris de Vreeze
  */
-final class ShowMethodUsage(val config: UsedMethodConfig) extends SemanticRule("ShowMethodUsage") {
+final class ShowClassUsage(val config: UsedClassConfig) extends SemanticRule("ShowClassUsage") {
 
-  def this() = this(UsedMethodConfig.default)
+  def this() = this(UsedClassConfig.default)
 
   private case class MatchingTerm(term: Term, methodSymbol: Symbol)
 
   override def withConfiguration(config: Configuration): Configured[Rule] =
     config.conf
-      .getOrElse("ShowMethodUsage")(this.config)
-      .map(newConfig => new ShowMethodUsage(newConfig))
+      .getOrElse("ShowClassUsage")(this.config)
+      .map(newConfig => new ShowClassUsage(newConfig))
 
   override def fix(implicit doc: SemanticDocument): Patch = {
     if (config.isEmpty) {
-      println("Missing methodSymbols (symbols of methods). Doing nothing.")
+      println("Missing classSymbols (symbols of classes/traits/objects). Doing nothing.")
       Patch.empty
     } else {
       // Replacing ".." in HOCON by "#"
-      val methodSymbols: Seq[Symbol] =
-        config.methodSymbols.ensuring(_.nonEmpty).map(_.replace("..", "#")).map(Symbol.apply)
+      val classSymbols: Seq[Symbol] =
+        config.classSymbols.ensuring(_.nonEmpty).map(_.replace("..", "#")).map(Symbol.apply)
 
-      methodSymbols.foreach(checkMethodSymbol)
+      classSymbols.foreach(checkClassSymbol)
 
       // TODO Term.Name if in the right context
       val matchingTerms: Seq[MatchingTerm] = doc.tree.collect {
-        case t: Term.Apply if methodSymbols.contains(t.fun.symbol) => MatchingTerm(t, t.fun.symbol)
+        case t: Term.Apply if classSymbols.contains(t.fun.symbol.owner) => MatchingTerm(t, t.fun.symbol)
       }
 
       val fileName: Path = doc.input.asInstanceOf[Input.VirtualFile].path.pipe(Paths.get(_)).getFileName
 
       println()
-      println(s"Usage of methods (one of ${methodSymbols.mkString(", ")}) in file $fileName:")
+      println(s"Usage of classes/traits/objects (one of ${classSymbols.mkString(", ")}) in file $fileName:")
 
       if (matchingTerms.isEmpty) {
         println("No usage found")
       } else {
         matchingTerms.foreach { case MatchingTerm(term, methodSymbol) =>
           println()
-          println(s"Usage of method $methodSymbol:")
+          println(s"Usage of class/trait/object symbol ${methodSymbol.owner}:")
           println(s"Term class name: ${term.getClass.getSimpleName}")
-          println(s"Syntax: ${term.syntax}")
-          println(s"Display name: ${term.symbol.displayName}")
-          println(s"Owner: ${term.symbol.owner}")
+          println(s"Syntax: ${printSyntax(term)}")
+          println(s"Term symbol display name: ${term.symbol.displayName}")
+          println(s"Term symbol: ${term.symbol}")
+          println(s"Term symbol owner: ${term.symbol.owner}")
         }
       }
 
@@ -99,19 +100,27 @@ final class ShowMethodUsage(val config: UsedMethodConfig) extends SemanticRule("
     }
   }
 
-  private def checkMethodSymbol(sym: Symbol)(implicit doc: SemanticDocument): Unit = {
-    require(sym.info.forall(_.isMethod), s"Not a method: $sym")
-    require(sym.info.forall(_.isPublic), s"Not a public method: $sym")
+  private def checkClassSymbol(sym: Symbol)(implicit doc: SemanticDocument): Unit = {
+    require(sym.info.forall(s => s.isClass || s.isTrait || s.isObject), s"Not a class/trait/object: $sym")
+    require(sym.info.forall(_.isPublic), s"Not a public class/trait/object: $sym")
+  }
+
+  private def printSyntax(t: Tree): String = {
+    val maxLength = 100
+
+    val syntax = t.syntax
+
+    if (syntax.lengthIs > maxLength) syntax.take(maxLength) + " ..." else syntax
   }
 
 }
 
-final case class UsedMethodConfig(methodSymbols: List[String] = Nil) {
-  def isEmpty: Boolean = methodSymbols.isEmpty
+final case class UsedClassConfig(classSymbols: List[String] = Nil) {
+  def isEmpty: Boolean = classSymbols.isEmpty
 }
 
-object UsedMethodConfig {
-  val default: UsedMethodConfig = UsedMethodConfig()
-  implicit val surface: Surface[UsedMethodConfig] = metaconfig.generic.deriveSurface[UsedMethodConfig]
-  implicit val decoder: ConfDecoder[UsedMethodConfig] = metaconfig.generic.deriveDecoder(default)
+object UsedClassConfig {
+  val default: UsedClassConfig = UsedClassConfig()
+  implicit val surface: Surface[UsedClassConfig] = metaconfig.generic.deriveSurface[UsedClassConfig]
+  implicit val decoder: ConfDecoder[UsedClassConfig] = metaconfig.generic.deriveDecoder(default)
 }
