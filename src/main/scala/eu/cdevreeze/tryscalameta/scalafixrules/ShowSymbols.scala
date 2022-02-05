@@ -50,14 +50,14 @@ import scalafix.v1._
 final class ShowSymbols extends SemanticRule("ShowSymbols") {
 
   override def fix(implicit doc: SemanticDocument): Patch = {
-    val trees: Seq[Tree] = doc.tree.collect { case t: Tree => t }.prepended(doc.tree)
+    val trees: Seq[Tree] = doc.tree.collect { case t: Tree => t } // Returns doc.tree as well, as first result
 
     val fileName: Path = doc.input.asInstanceOf[Input.VirtualFile].path.pipe(Paths.get(_)).getFileName
 
     println()
     println(s"Trees and their corresponding symbols in file $fileName:")
 
-    trees.foreach(stat => printTreeInfo(stat, fileName))
+    trees.foreach(t => printTreeInfo(t, fileName))
 
     Patch.empty
   }
