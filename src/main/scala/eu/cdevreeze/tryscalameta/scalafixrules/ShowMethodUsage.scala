@@ -19,16 +19,17 @@ package eu.cdevreeze.tryscalameta.scalafixrules
 import java.nio.file.Path
 import java.nio.file.Paths
 
-import scalafix.v1._
 import scala.meta._
 import scala.util.chaining.scalaUtilChainingOps
 
 import metaconfig.ConfDecoder
 import metaconfig.Configured
 import metaconfig.generic.Surface
+import scalafix.v1._
 
 /**
- * Shows usage of public methods whose symbols are passed as configuration data.
+ * Shows usage of public methods whose symbols are passed as configuration data. Only exact matches are returned,
+ * without following any inheritance chains.
  *
  * This "rule" only depends on the Scala standard library and on Scalafix (and therefore Scalameta) and nothing else, so
  * this rule can easily be run from its source path against sbt or Maven projects. For example: "scalafix
@@ -54,8 +55,6 @@ final class ShowMethodUsage(val config: UsedMethodConfig) extends SemanticRule("
 
   def this() = this(UsedMethodConfig.default)
 
-  private case class MatchingTerm(term: Term, methodSymbol: Symbol)
-
   override def withConfiguration(config: Configuration): Configured[Rule] =
     config.conf
       .getOrElse("ShowMethodUsage")(this.config)
@@ -72,26 +71,36 @@ final class ShowMethodUsage(val config: UsedMethodConfig) extends SemanticRule("
 
       methodSymbols.foreach(checkMethodSymbol)
 
-      // TODO Term.Name if in the right context
-      val matchingTerms: Seq[MatchingTerm] = doc.tree.collect {
-        case t: Term.Apply if methodSymbols.contains(t.fun.symbol) => MatchingTerm(t, t.fun.symbol)
-      }
+      val matchingTrees: Seq[Tree] = doc.tree.collect { case t: Tree if methodSymbols.contains(t.symbol) => t }
 
       val fileName: Path = doc.input.asInstanceOf[Input.VirtualFile].path.pipe(Paths.get(_)).getFileName
 
       println()
       println(s"Usage of methods (one of ${methodSymbols.mkString(", ")}) in file $fileName:")
 
-      if (matchingTerms.isEmpty) {
+      if (matchingTrees.isEmpty) {
         println("No usage found")
       } else {
-        matchingTerms.foreach { case MatchingTerm(term, methodSymbol) =>
+        println()
+        println(
+          s"Kinds (classes) of matching trees: ${matchingTrees.map(_.getClass.getSimpleName).distinct.mkString(", ")}"
+        )
+
+        matchingTrees.foreach { tree =>
           println()
-          println(s"Usage of method $methodSymbol:")
-          println(s"Term class name: ${term.getClass.getSimpleName}")
-          println(s"Syntax: ${term.syntax}")
-          println(s"Display name: ${term.symbol.displayName}")
-          println(s"Owner: ${term.symbol.owner}")
+          println(s"Source file: $fileName")
+          println(
+            s"Position: line ${tree.pos.startLine}, col ${tree.pos.startColumn} .. line ${tree.pos.endLine}, col ${tree.pos.endColumn}"
+          )
+          printTreeInfo(tree, "")
+
+          tree.parent.foreach { parentTree =>
+            printTreeInfo(parentTree, "Parent tree -> ")
+
+            parentTree.parent.foreach { grandParentTree =>
+              printTreeInfo(grandParentTree, "Grandparent tree -> ")
+            }
+          }
         }
       }
 
@@ -99,9 +108,25 @@ final class ShowMethodUsage(val config: UsedMethodConfig) extends SemanticRule("
     }
   }
 
+  private def printTreeInfo(tree: Tree, messagePrefix: String)(implicit doc: SemanticDocument): Unit = {
+    println(messagePrefix + s"Kind of tree (class name): ${tree.getClass.getSimpleName}")
+    println(messagePrefix + s"Syntax: ${printSyntax(tree)}")
+    println(messagePrefix + s"Symbol: ${tree.symbol}")
+    println(messagePrefix + s"Symbol display name: ${tree.symbol.displayName}")
+    println(messagePrefix + s"Symbol owner: ${tree.symbol.owner}")
+  }
+
   private def checkMethodSymbol(sym: Symbol)(implicit doc: SemanticDocument): Unit = {
     require(sym.info.forall(_.isMethod), s"Not a method: $sym")
     require(sym.info.forall(_.isPublic), s"Not a public method: $sym")
+  }
+
+  private def printSyntax(t: Tree): String = {
+    val maxLength = 100
+
+    val syntax = t.syntax
+
+    if (syntax.length > maxLength) syntax.take(maxLength) + " ..." else syntax
   }
 
 }

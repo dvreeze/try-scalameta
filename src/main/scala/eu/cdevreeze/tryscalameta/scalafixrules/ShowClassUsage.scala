@@ -28,7 +28,8 @@ import metaconfig.generic.Surface
 import scalafix.v1._
 
 /**
- * Shows usage of public classes/traits/objects in method calls whose symbols are passed as configuration data.
+ * Shows usage of public classes/traits/objects whose symbols are passed as configuration data. Only exact matches are
+ * returned, without following any inheritance chains.
  *
  * This "rule" only depends on the Scala standard library and on Scalafix (and therefore Scalameta) and nothing else, so
  * this rule can easily be run from its source path against sbt or Maven projects. For example: "scalafix
@@ -54,8 +55,6 @@ final class ShowClassUsage(val config: UsedClassConfig) extends SemanticRule("Sh
 
   def this() = this(UsedClassConfig.default)
 
-  private case class MatchingTerm(term: Term, methodSymbol: Symbol)
-
   override def withConfiguration(config: Configuration): Configured[Rule] =
     config.conf
       .getOrElse("ShowClassUsage")(this.config)
@@ -67,37 +66,54 @@ final class ShowClassUsage(val config: UsedClassConfig) extends SemanticRule("Sh
       Patch.empty
     } else {
       // Replacing ".." in HOCON by "#"
-      val classSymbols: Seq[Symbol] =
-        config.classSymbols.ensuring(_.nonEmpty).map(_.replace("..", "#")).map(Symbol.apply)
+      val classSymbols: Set[Symbol] =
+        config.classSymbols.ensuring(_.nonEmpty).map(_.replace("..", "#")).map(Symbol.apply).toSet
 
       classSymbols.foreach(checkClassSymbol)
 
-      // TODO Term.Name if in the right context
-      val matchingTerms: Seq[MatchingTerm] = doc.tree.collect {
-        case t: Term.Apply if classSymbols.contains(t.fun.symbol.owner) => MatchingTerm(t, t.fun.symbol)
-      }
+      val matchingTrees: Seq[Tree] = doc.tree.collect { case t: Tree if classSymbols.contains(t.symbol) => t }
 
       val fileName: Path = doc.input.asInstanceOf[Input.VirtualFile].path.pipe(Paths.get(_)).getFileName
 
       println()
       println(s"Usage of classes/traits/objects (one of ${classSymbols.mkString(", ")}) in file $fileName:")
 
-      if (matchingTerms.isEmpty) {
+      if (matchingTrees.isEmpty) {
         println("No usage found")
       } else {
-        matchingTerms.foreach { case MatchingTerm(term, methodSymbol) =>
+        println()
+        println(
+          s"Kinds (classes) of matching trees: ${matchingTrees.map(_.getClass.getSimpleName).distinct.mkString(", ")}"
+        )
+
+        matchingTrees.foreach { tree =>
           println()
-          println(s"Usage of class/trait/object symbol ${methodSymbol.owner}:")
-          println(s"Term class name: ${term.getClass.getSimpleName}")
-          println(s"Syntax: ${printSyntax(term)}")
-          println(s"Term symbol display name: ${term.symbol.displayName}")
-          println(s"Term symbol: ${term.symbol}")
-          println(s"Term symbol owner: ${term.symbol.owner}")
+          println(s"Source file: $fileName")
+          println(
+            s"Position: line ${tree.pos.startLine}, col ${tree.pos.startColumn} .. line ${tree.pos.endLine}, col ${tree.pos.endColumn}"
+          )
+          printTreeInfo(tree, "")
+
+          tree.parent.foreach { parentTree =>
+            printTreeInfo(parentTree, "Parent tree -> ")
+
+            parentTree.parent.foreach { grandParentTree =>
+              printTreeInfo(grandParentTree, "Grandparent tree -> ")
+            }
+          }
         }
       }
 
       Patch.empty
     }
+  }
+
+  private def printTreeInfo(tree: Tree, messagePrefix: String)(implicit doc: SemanticDocument): Unit = {
+    println(messagePrefix + s"Kind of tree (class name): ${tree.getClass.getSimpleName}")
+    println(messagePrefix + s"Syntax: ${printSyntax(tree)}")
+    println(messagePrefix + s"Symbol: ${tree.symbol}")
+    println(messagePrefix + s"Symbol display name: ${tree.symbol.displayName}")
+    println(messagePrefix + s"Symbol owner: ${tree.symbol.owner}")
   }
 
   private def checkClassSymbol(sym: Symbol)(implicit doc: SemanticDocument): Unit = {
