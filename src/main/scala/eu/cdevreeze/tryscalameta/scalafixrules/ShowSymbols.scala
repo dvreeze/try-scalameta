@@ -19,12 +19,13 @@ package eu.cdevreeze.tryscalameta.scalafixrules
 import java.nio.file.Path
 import java.nio.file.Paths
 
-import scalafix.v1._
 import scala.meta._
 import scala.util.chaining.scalaUtilChainingOps
 
+import scalafix.v1._
+
 /**
- * Shows statements and their corresponding symbols.
+ * Shows trees and their corresponding symbols.
  *
  * This "rule" only depends on the Scala standard library and on Scalafix (and therefore Scalameta) and nothing else, so
  * this rule can easily be run from its source path against sbt or Maven projects. For example: "scalafix
@@ -49,24 +50,39 @@ import scala.util.chaining.scalaUtilChainingOps
 final class ShowSymbols extends SemanticRule("ShowSymbols") {
 
   override def fix(implicit doc: SemanticDocument): Patch = {
-    val stats: Seq[Stat] = doc.tree.collect { case t: Stat => t }
+    val trees: Seq[Tree] = doc.tree.collect { case t: Tree => t }.prepended(doc.tree)
 
     val fileName: Path = doc.input.asInstanceOf[Input.VirtualFile].path.pipe(Paths.get(_)).getFileName
 
     println()
-    println(s"Statements and their corresponding symbols in file $fileName:")
+    println(s"Trees and their corresponding symbols in file $fileName:")
 
-    stats.foreach(printStatInfo)
+    trees.foreach(stat => printTreeInfo(stat, fileName))
 
     Patch.empty
   }
 
-  private def printStatInfo(t: Stat)(implicit doc: SemanticDocument): Unit = {
+  private def printTreeInfo(t: Tree, fileName: Path)(implicit doc: SemanticDocument): Unit = {
     println()
-    println(s"Kind of statement (class name): ${t.getClass.getSimpleName}")
+    println(s"Source file: $fileName")
+    println(
+      s"Position: line ${t.pos.startLine}, col ${t.pos.startColumn} .. line ${t.pos.endLine}, col ${t.pos.endColumn}"
+    )
+    println(s"Kind of tree (class name): ${t.getClass.getSimpleName}")
     println(s"Syntax: ${printSyntax(t)}")
     println(s"Symbol: ${t.symbol}")
     println(s"Symbol owner: ${t.symbol.owner}")
+
+    t match {
+      case t: Stat =>
+        println(s"isTopLevelStat: ${t.isTopLevelStat}")
+        println(s"isTemplateStat: ${t.isTemplateStat}")
+        println(s"isBlockStat: ${t.isBlockStat}")
+        println(s"isEarlyStat: ${t.isEarlyStat}")
+        println(s"isExistentialStat: ${t.isExistentialStat}")
+        println(s"isRefineStat: ${t.isRefineStat}")
+      case _ => ()
+    }
   }
 
   private def printSyntax(t: Tree): String = {
@@ -74,7 +90,7 @@ final class ShowSymbols extends SemanticRule("ShowSymbols") {
 
     val syntax = t.syntax
 
-    if (syntax.lengthIs > maxLength) syntax.take(maxLength) + " ..." else syntax
+    if (syntax.length > maxLength) syntax.take(maxLength) + " ..." else syntax
   }
 
 }

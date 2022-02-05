@@ -19,13 +19,13 @@ package eu.cdevreeze.tryscalameta.scalafixrules
 import java.nio.file.Path
 import java.nio.file.Paths
 
-import scalafix.v1._
 import scala.meta._
 import scala.util.chaining.scalaUtilChainingOps
 
 import metaconfig.ConfDecoder
 import metaconfig.Configured
 import metaconfig.generic.Surface
+import scalafix.v1._
 
 /**
  * Shows usage of public classes/traits/objects in method calls whose symbols are passed as configuration data.
@@ -110,7 +110,7 @@ final class ShowClassUsage(val config: UsedClassConfig) extends SemanticRule("Sh
 
     val syntax = t.syntax
 
-    if (syntax.lengthIs > maxLength) syntax.take(maxLength) + " ..." else syntax
+    if (syntax.length > maxLength) syntax.take(maxLength) + " ..." else syntax
   }
 
 }
