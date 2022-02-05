@@ -71,7 +71,9 @@ final class ShowMethodUsage(val config: UsedMethodConfig) extends SemanticRule("
 
       methodSymbols.foreach(checkMethodSymbol)
 
-      val matchingTrees: Seq[Tree] = doc.tree.collect { case t: Tree if methodSymbols.contains(t.symbol) => t }
+      val symbolMatcher: SymbolMatcher = methodSymbols.map(s => SymbolMatcher.exact(s.toString)).reduce(_ + _)
+
+      val matchingTrees: Seq[Tree] = doc.tree.collect { case t: Tree if symbolMatcher.matches(t) => t }
 
       val fileName: Path = doc.input.asInstanceOf[Input.VirtualFile].path.pipe(Paths.get(_)).getFileName
 

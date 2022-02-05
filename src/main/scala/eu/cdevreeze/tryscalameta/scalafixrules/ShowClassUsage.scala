@@ -71,7 +71,9 @@ final class ShowClassUsage(val config: UsedClassConfig) extends SemanticRule("Sh
 
       classSymbols.foreach(checkClassSymbol)
 
-      val matchingTrees: Seq[Tree] = doc.tree.collect { case t: Tree if classSymbols.contains(t.symbol) => t }
+      val symbolMatcher: SymbolMatcher = classSymbols.map(s => SymbolMatcher.exact(s.toString)).reduce(_ + _)
+
+      val matchingTrees: Seq[Tree] = doc.tree.collect { case t: Tree if symbolMatcher.matches(t) => t }
 
       val fileName: Path = doc.input.asInstanceOf[Input.VirtualFile].path.pipe(Paths.get(_)).getFileName
 
