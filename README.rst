@@ -188,8 +188,8 @@ It is possible to `run ad-hoc Scalafix rules from source code`_. Scalafix will t
 run it. The most important downside is that such a rule implementation may not have any other dependencies than
 Scalafix (so it can depend only on Scalafix, Scalameta, `metaconfig`_, and the standard Scala and Java APIs).
 
-Obviously, the projects against which Scalafix rules are run must be set up to generate SemanticDB
-output. Assuming that SemanticDB output has been generated, Scalafix rules can be run from source code
+Obviously, the projects against which (semantic) Scalafix rules are run must be set up to generate SemanticDB
+output. Assuming that SemanticDB output has been generated, if needed, Scalafix rules can be run from source code
 as follows (on the command line)::
 
     scalafix --rules=file:/path/to/rule-implementation \
@@ -203,7 +203,8 @@ The "classpath" setting must point to the parent directory of "META-INF/semantic
 source directories are in scope.
 
 Hence, with a small collection of ad-hoc Scalafix rules and corresponding config files, meta-programming
-can be applied to large code bases, provided their builds are set up to generate SemanticDB output.
+can be applied to large code bases, provided their builds are set up to generate SemanticDB output
+(if the rules are semantic rules).
 
 It is possible to run Scalafix as sbt or Maven commands, depending on whether the target code bases
 are sbt or Maven projects. That would make it easier to run Scalafix without worrying whether
