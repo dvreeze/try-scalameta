@@ -47,7 +47,7 @@ Program *ShowSourceContents* uses quasiquotes to a limited extent. This program 
 
 The (general) Tree query API of scalameta is a bit minimal, offering functions such as *collect*
 (or "custom traversal support" if more fine-grained control is needed than *collect* and friends offer).
-Function *collect* returns matching descendant-or-self tree nodes (in "XPath terms"), so also
+Function *collect* traverses matching descendant-or-self tree nodes (in "XPath terms"), so also
 the matching descendants of matching descendants-or-self, etc. Object *contrib.TreeOps* improves on the minimal query API,
 but we do not need to stop there. Hence the creation of *QuerySupport* in this project. It is
 also inspired by XPath axes, but in addition offers methods to return only topmost descendant(-or-self)
