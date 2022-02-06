@@ -57,4 +57,5 @@ object VirtualFileSupport {
     // Does not follow symbolic links
     Using.resource(Files.walk(dir)) { _.toScala(Seq).filter(f => Files.isRegularFile(f)) }
   }
+
 }

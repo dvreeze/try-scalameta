@@ -22,8 +22,8 @@ import java.nio.file.Path
 import java.nio.file.Paths
 import java.nio.file.StandardCopyOption
 
-import scala.meta._
 import scala.meta.XtensionParseInputLike
+import scala.meta._
 import scala.meta.contrib._
 import scala.util.chaining.scalaUtilChainingOps
 
