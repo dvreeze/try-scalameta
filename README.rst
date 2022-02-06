@@ -235,5 +235,5 @@ those REPL sessions, or can be used for inspiration.
 .. _`SemanticDb Specification`: https://scalameta.org/docs/semanticdb/specification.html
 .. _`Scalafix`: https://scalacenter.github.io/scalafix/docs/users/installation.html
 .. _`Scalafix API Overview`: https://scalacenter.github.io/scalafix/docs/developers/api.html
-.. _`metaconfig`:https://scalameta.org/metaconfig/docs/getting-started.html
 .. _`run ad-hoc Scalafix rules from source code`: https://scalacenter.github.io/scalafix/docs/developers/tutorial.html#run-the-rule-from-source-code
+.. _`metaconfig`: https://scalameta.org/metaconfig/docs/getting-started.html
