@@ -24,6 +24,7 @@ import java.nio.file.Paths
 import scala.io.Codec
 import scala.util.Try
 import scala.util.Using
+import scala.util.control.NonFatal
 
 import scopt.OParser
 import scopt.OParserBuilder
@@ -80,9 +81,10 @@ object RunForSubDirectories {
 
       val process: Process = pb.start()
       process.waitFor()
-    }.getOrElse {
+    }.recover { case NonFatal(t) =>
       Console.err.println(s"Command failed for sub-directory '${rootDir.resolve(subdirName)}'")
-    }
+      Console.err.println(s"Thrown exception: $t")
+    }.get
   }
 
   private def createProcessBuilder(
