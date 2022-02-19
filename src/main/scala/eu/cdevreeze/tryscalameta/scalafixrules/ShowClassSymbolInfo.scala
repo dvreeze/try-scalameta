@@ -31,7 +31,7 @@ import scalafix.v1._
  *
  * This "rule" only depends on the Scala standard library and on Scalafix (and therefore Scalameta) and nothing else, so
  * this rule can easily be run from its source path against sbt or Maven projects. For example: "scalafix
- * --rules=file:/path/to/ShowMethodUsage.scala --config=/path/to/scalafix-config-file --classpath=./target/classes"
+ * --rules=file:/path/to/ShowClassSymbolInfo.scala --config=/path/to/scalafix-config-file --classpath=./target/classes"
  *
  * The classpath configuration option should point to the parent directory of a "META-INF/semanticdb/src/main/scala"
  * directory, where the "*.scala.semanticdb" files live.
