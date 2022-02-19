@@ -130,7 +130,7 @@ The *metac* tool can be invoked in the same way, with the same "options" and "so
 
 Below it is described how such a setup can be achieved (although we would rarely need this). It is
 assumed that Scala 2.13 is used, both in the code base against which the metac tool is run
-and in the scalac and metac tools themselves (obviously). The idea is to generate the "options"
+and in the scalac and metac tools themselves. The idea is to generate the "options"
 and "sources" files, and then run metac using those 2 files. Let's assume the code base
 corresponds to artifact ``eu.cdevreeze.tqa:tqa_2.13:0.13.0``, and that Coursier has been
 installed (like scalac for Scala 2.13 and metac). The needed steps are:
