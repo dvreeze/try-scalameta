@@ -127,7 +127,12 @@ final class ShowClassSymbolInfo extends SemanticRule("ShowClassSymbolInfo") {
       createMetadataAnnot("symbol", info.symbol.toString),
       createMetadataAnnot("displayName", info.displayName),
       createMetadataAnnot("isScala", info.isScala.toString),
-      createMetadataAnnot("kind", getKind(info))
+      createMetadataAnnot("kind", getKind(info)),
+      createMetadataAnnot("isAbstract", info.isAbstract.toString),
+      createMetadataAnnot("isFinal", info.isFinal.toString),
+      createMetadataAnnot("isSealed", info.isSealed.toString),
+      createMetadataAnnot("isImplicit", info.isImplicit.toString),
+      createMetadataAnnot("isCase", info.isCase.toString),
     )
       .appendedAll(signature.typeParameters.map(typePar => createMetadataAnnot("typeParameter", typePar.toString)))
       .appendedAll(signature.parents.map(parent => createMetadataAnnot("parent", parent.toString)))
@@ -169,29 +174,30 @@ object ShowClassSymbolInfo {
     private val typePlaceholder: Type.Name = Type.Name("Some__Type")
 
     def stripImplementation(defn: Defn.Class): Defn.Class = {
-      defn.copy(templ = defn.templ.pipe { tpl =>
-        tpl.copy(early = tpl.early.map(stripImplementation), stats = tpl.stats.map(stripImplementation))
-      })
+      defn.copy(templ = defn.templ.pipe(stripImplementation))
     }
 
     def stripImplementation(defn: Defn.Trait): Defn.Trait = {
-      defn.copy(templ = defn.templ.pipe { tpl =>
-        tpl.copy(early = tpl.early.map(stripImplementation), stats = tpl.stats.map(stripImplementation))
-      })
+      defn.copy(templ = defn.templ.pipe(stripImplementation))
     }
 
     def stripImplementation(defn: Defn.Object): Defn.Object = {
-      defn.copy(templ = defn.templ.pipe { tpl =>
-        tpl.copy(early = tpl.early.map(stripImplementation), stats = tpl.stats.map(stripImplementation))
-      })
+      defn.copy(templ = defn.templ.pipe(stripImplementation))
+    }
+
+    private def stripImplementation(templ: Template): Template = {
+      templ.copy(early = templ.early.map(stripImplementation), stats = templ.stats.map(stripImplementation))
     }
 
     private def stripImplementation(stat: Stat): Stat = stat match {
-      case defn: Defn.Def  => stripImplementation(defn)
-      case defn: Defn.Val  => stripImplementation(defn)
-      case defn: Defn.Var  => stripImplementation(defn)
-      case defn: Defn.Type => stripImplementation(defn)
-      case stat            => stat
+      case defn: Defn.Def    => stripImplementation(defn)
+      case defn: Defn.Val    => stripImplementation(defn)
+      case defn: Defn.Var    => stripImplementation(defn)
+      case defn: Defn.Type   => stripImplementation(defn)
+      case defn: Defn.Class  => stripImplementation(defn)
+      case defn: Defn.Trait  => stripImplementation(defn)
+      case defn: Defn.Object => stripImplementation(defn)
+      case stat              => stat
     }
 
     private def stripImplementation(defn: Defn.Def): Defn.Def = {
