@@ -56,7 +56,6 @@ object ShowSourceContents {
   private val checkPackagesAgainstDirs: Boolean = sys.props.getOrElse("checkPackagesAgainstDirs", "true").toBoolean
 
   private val termPlaceholder: Term.Name = Term.Name("???")
-  private val typePlaceholder: Type.Name = Type.Name("Some__Type")
   private val templatePlaceholder: Template = Template(Nil, Nil, emptySelf, Nil)
 
   private final case class SourceWithPath(source: Source, absolutePath: Path, sourceRootDir: Path) {
@@ -342,7 +341,6 @@ object ShowSourceContents {
           termPlaceholder
         case _: Term.Do | _: Term.For | _: Term.ForYield | _: Term.Match | _: Term.While =>
           termPlaceholder
-        case _: Type.Match     => typePlaceholder
         case _: Template       => templatePlaceholder
         case t: Name.Anonymous => t // Apparently needed, to avoid infinite recursion
         case t: Term.Name      => t
@@ -361,10 +359,7 @@ object ShowSourceContents {
   }
 
   private def simplifyType(tpe: Type): Type = {
-    simplifyTree(tpe).pipe { t =>
-      if (t.findAllDescendantsOrSelf[Tree]().sizeIs <= maxNodesInSimplifiedTree) t.asInstanceOf[Type]
-      else typePlaceholder
-    }
+    simplifyTree(tpe).asInstanceOf[Type]
   }
 
   private def isDefnOrDecl(stat: Stat): Boolean = stat match {

@@ -132,7 +132,7 @@ final class ShowClassSymbolInfo extends SemanticRule("ShowClassSymbolInfo") {
       createMetadataAnnot("isFinal", info.isFinal.toString),
       createMetadataAnnot("isSealed", info.isSealed.toString),
       createMetadataAnnot("isImplicit", info.isImplicit.toString),
-      createMetadataAnnot("isCase", info.isCase.toString),
+      createMetadataAnnot("isCase", info.isCase.toString)
     )
       .appendedAll(signature.typeParameters.map(typePar => createMetadataAnnot("typeParameter", typePar.toString)))
       .appendedAll(signature.parents.map(parent => createMetadataAnnot("parent", parent.toString)))
@@ -171,7 +171,6 @@ object ShowClassSymbolInfo {
   private object StripImplementation {
 
     private val termPlaceholder: Term.Name = Term.Name("???")
-    private val typePlaceholder: Type.Name = Type.Name("Some__Type")
 
     def stripImplementation(defn: Defn.Class): Defn.Class = {
       defn.copy(templ = defn.templ.pipe(stripImplementation))
@@ -193,7 +192,6 @@ object ShowClassSymbolInfo {
       case defn: Defn.Def    => stripImplementation(defn)
       case defn: Defn.Val    => stripImplementation(defn)
       case defn: Defn.Var    => stripImplementation(defn)
-      case defn: Defn.Type   => stripImplementation(defn)
       case defn: Defn.Class  => stripImplementation(defn)
       case defn: Defn.Trait  => stripImplementation(defn)
       case defn: Defn.Object => stripImplementation(defn)
@@ -210,10 +208,6 @@ object ShowClassSymbolInfo {
 
     private def stripImplementation(defn: Defn.Var): Defn.Var = {
       defn.copy(rhs = defn.rhs.map(_ => termPlaceholder))
-    }
-
-    private def stripImplementation(defn: Defn.Type): Defn.Type = {
-      defn.copy(body = typePlaceholder)
     }
 
   }
