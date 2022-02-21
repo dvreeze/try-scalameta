@@ -143,7 +143,7 @@ final class ShowClassSymbolInfo extends SemanticRule("ShowClassSymbolInfo") {
       .appended(createMetadataAnnot("self", signature.self.toString))
       .appendedAll(signature.declarations.flatMap { decl =>
         decl.symbol.info.get.overriddenSymbols
-          .map(sym => createMetadataAnnot("overridden-decl", sym.toString))
+          .map(sym => createMetadataAnnot("overridden-decl", sym.info.map(_.toString).getOrElse(sym.toString)))
           .prepended(createMetadataAnnot("decl-info", decl.symbol.info.get.toString))
       })
   }

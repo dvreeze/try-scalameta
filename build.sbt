@@ -43,6 +43,8 @@ ThisBuild / libraryDependencies += "org.scalameta" %% "scalafmt-dynamic" % "3.3.
 
 ThisBuild / libraryDependencies += "ch.epfl.scala" %% "scalafix-rules" % "0.9.34"
 
+ThisBuild / libraryDependencies += "ch.epfl.scala" % "scalafix-interfaces" % "0.9.34"
+
 ThisBuild / libraryDependencies += "com.geirsson" %% "metaconfig-typesafe-config" % "0.10.0"
 
 ThisBuild / libraryDependencies += "com.github.scopt" %% "scopt" % "4.0.1"
