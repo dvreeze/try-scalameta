@@ -88,7 +88,7 @@ final class ShowClassSymbolInfo extends SemanticRule("ShowClassSymbolInfo") {
     defn.symbol.info.get.ensuring(_.isClass).ensuring(_.isScala).pipe(info => annotateClass(defn, info).syntax)
   }
 
-  private def annotateClass(defn: Defn.Class, info: SymbolInformation): Defn.Class = {
+  private def annotateClass(defn: Defn.Class, info: SymbolInformation)(implicit doc: SemanticDocument): Defn.Class = {
     require(info.isClass, s"Not a class: $info")
 
     val metadata: Seq[Mod.Annot] = getClassMetadata(info)
@@ -100,7 +100,7 @@ final class ShowClassSymbolInfo extends SemanticRule("ShowClassSymbolInfo") {
     defn.symbol.info.get.ensuring(_.isTrait).ensuring(_.isScala).pipe(info => annotateTrait(defn, info).syntax)
   }
 
-  private def annotateTrait(defn: Defn.Trait, info: SymbolInformation): Defn.Trait = {
+  private def annotateTrait(defn: Defn.Trait, info: SymbolInformation)(implicit doc: SemanticDocument): Defn.Trait = {
     require(info.isTrait, s"Not a trait: $info")
 
     val metadata: Seq[Mod.Annot] = getClassMetadata(info)
@@ -112,7 +112,9 @@ final class ShowClassSymbolInfo extends SemanticRule("ShowClassSymbolInfo") {
     defn.symbol.info.get.ensuring(_.isObject).ensuring(_.isScala).pipe(info => annotateObject(defn, info).syntax)
   }
 
-  private def annotateObject(defn: Defn.Object, info: SymbolInformation): Defn.Object = {
+  private def annotateObject(defn: Defn.Object, info: SymbolInformation)(implicit
+      doc: SemanticDocument
+  ): Defn.Object = {
     require(info.isObject, s"Not an object: $info")
 
     val metadata: Seq[Mod.Annot] = getClassMetadata(info)
@@ -120,11 +122,12 @@ final class ShowClassSymbolInfo extends SemanticRule("ShowClassSymbolInfo") {
     metadata.map(_.syntax).appended(defn.syntax).mkString("\n").pipe(_.parse[Stat].get.asInstanceOf[Defn.Object])
   }
 
-  private def getClassMetadata(info: SymbolInformation): Seq[Mod.Annot] = {
+  private def getClassMetadata(info: SymbolInformation)(implicit doc: SemanticDocument): Seq[Mod.Annot] = {
     val signature: ClassSignature = info.signature.asInstanceOf[ClassSignature]
 
     Seq(
       createMetadataAnnot("symbol", info.symbol.toString),
+      createMetadataAnnot("owner", info.owner.toString),
       createMetadataAnnot("displayName", info.displayName),
       createMetadataAnnot("isScala", info.isScala.toString),
       createMetadataAnnot("kind", getKind(info)),
@@ -134,10 +137,15 @@ final class ShowClassSymbolInfo extends SemanticRule("ShowClassSymbolInfo") {
       createMetadataAnnot("isImplicit", info.isImplicit.toString),
       createMetadataAnnot("isCase", info.isCase.toString)
     )
+      .appendedAll(info.overriddenSymbols.map(sym => createMetadataAnnot("overridden-symbol", sym.toString)))
       .appendedAll(signature.typeParameters.map(typePar => createMetadataAnnot("typeParameter", typePar.toString)))
       .appendedAll(signature.parents.map(parent => createMetadataAnnot("parent", parent.toString)))
       .appended(createMetadataAnnot("self", signature.self.toString))
-      .appendedAll(signature.declarations.map(decl => createMetadataAnnot("decl", decl.symbol.toString)))
+      .appendedAll(signature.declarations.flatMap { decl =>
+        decl.symbol.info.get.overriddenSymbols
+          .map(sym => createMetadataAnnot("overridden-decl", sym.toString))
+          .prepended(createMetadataAnnot("decl-info", decl.symbol.info.get.toString))
+      })
   }
 
   private def createMetadataAnnot(key: String, value: String): Mod.Annot = {
