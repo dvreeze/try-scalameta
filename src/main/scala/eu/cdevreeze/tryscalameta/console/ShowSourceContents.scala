@@ -56,7 +56,9 @@ object ShowSourceContents {
   private val checkPackagesAgainstDirs: Boolean = sys.props.getOrElse("checkPackagesAgainstDirs", "true").toBoolean
 
   private val termPlaceholder: Term.Name = Term.Name("???")
-  private val templatePlaceholder: Template = Template(Nil, Nil, emptySelf, Nil)
+
+  private val templatePlaceholder: Template =
+    Template(early = Nil, inits = Nil, self = emptySelf, stats = Nil, derives = Nil)
 
   private final case class SourceWithPath(source: Source, absolutePath: Path, sourceRootDir: Path) {
     require(Files.isDirectory(sourceRootDir), s"Not a directory: '$sourceRootDir")
@@ -168,7 +170,8 @@ object ShowSourceContents {
             early = Nil,
             inits = Nil,
             self = emptySelf,
-            stats = newSources.map(addCommentsAsAnnots).flatMap(_.stats).toList
+            stats = newSources.map(addCommentsAsAnnots).flatMap(_.stats).toList,
+            derives = Nil
           )
         )
       )
@@ -277,7 +280,7 @@ object ShowSourceContents {
   }
 
   private def transformVarDefn(defn: Defn.Var): Defn.Var = {
-    defn.copy(rhs = defn.rhs.map(simplifyTerm))
+    defn.copy(rhs = Some(defn.body.pipe(simplifyTerm)))
   }
 
   private def transformTypeDefn(defn: Defn.Type): Defn.Type = {
@@ -328,7 +331,7 @@ object ShowSourceContents {
   private def addCommentAsAnnot(mods: List[Mod], comment: String): List[Mod] = {
     mods.prepended(
       Mod.Annot(init =
-        Init(tpe = Type.Name("comment"), name = Name.Anonymous(), argss = List(List(Lit.String(comment))))
+        Init(tpe = Type.Name("comment"), name = Name.Anonymous(), argClauses = List(List(Lit.String(comment))))
       )
     )
   }
@@ -370,20 +373,20 @@ object ShowSourceContents {
   private def isPublic(mods: List[Mod]): Boolean = !mods.exists(_.isAccessMod)
 
   private def removeThrowsAnnot(mods: List[Mod]): List[Mod] = mods.filterNot {
-    case Mod.Annot(Init(Type.Apply(Type.Name("throws"), _), _, _)) => true
-    case _                                                         => false
+    case Mod.Annot(Init.After_4_6_0(Type.Apply.After_4_6_0(Type.Name("throws"), _), _, _)) => true
+    case _                                                                                 => false
   }
 
   private def removeDefaultArgs(ctor: Ctor.Primary): Ctor.Primary = {
-    ctor.copy(paramss = ctor.paramss.map(_.map(removeDefaultArgs)))
+    ctor.copy(paramss = ctor.paramClauses.toList.map(_.map(removeDefaultArgs)))
   }
 
   private def removeDefaultArgs(decl: Decl.Def): Decl.Def = {
-    decl.copy(paramss = decl.paramss.map(_.map(removeDefaultArgs)))
+    decl.copy(paramss = decl.paramClauses.toList.map(_.map(removeDefaultArgs)))
   }
 
   private def removeDefaultArgs(defn: Defn.Def): Defn.Def = {
-    defn.copy(paramss = defn.paramss.map(_.map(removeDefaultArgs)))
+    defn.copy(paramss = defn.paramClauses.toList.map(_.map(removeDefaultArgs)))
   }
 
   private def removeDefaultArgs(param: Term.Param): Term.Param = param.copy(default = None)

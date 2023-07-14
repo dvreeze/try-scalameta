@@ -150,7 +150,11 @@ final class ShowClassSymbolInfo extends SemanticRule("ShowClassSymbolInfo") {
 
   private def createMetadataAnnot(key: String, value: String): Mod.Annot = {
     Mod.Annot(
-      Init(tpe = MetadataAnnotType, name = Name.Anonymous(), argss = List(List(Lit.String(key), Lit.String(value))))
+      Init(
+        tpe = MetadataAnnotType,
+        name = Name.Anonymous(),
+        argClauses = List(List(Lit.String(key), Lit.String(value)))
+      )
     )
   }
 
@@ -215,7 +219,7 @@ object ShowClassSymbolInfo {
     }
 
     private def stripImplementation(defn: Defn.Var): Defn.Var = {
-      defn.copy(rhs = defn.rhs.map(_ => termPlaceholder))
+      defn.copy(rhs = Some(defn.body.pipe(_ => termPlaceholder)))
     }
 
   }
