@@ -45,33 +45,28 @@ final class NestedCaseClasses extends SyntacticRule("NestedCaseClasses") {
         val wronglyNested = filterAncestors(caseClassDefn, isClassOrTraitDefn).nonEmpty
 
         if (wronglyNested) {
-          Patch.lint(
-            Diagnostic(
-              id = "case class",
-              message = "case class nested inside another class or trait",
-              position = caseClassDefn.pos
-            )
+          Diagnostic(
+            id = "case class",
+            message = "case class nested inside another class or trait",
+            position = caseClassDefn.pos
           )
         } else {
-          Patch.lint(
-            Diagnostic(
-              id = "case class",
-              message = "case class encountered",
-              position = caseClassDefn.pos,
-              severity = LintSeverity.Info
-            )
+          Diagnostic(
+            id = "case class",
+            message = "case class encountered",
+            position = caseClassDefn.pos,
+            severity = LintSeverity.Info
           )
         }
       }
+      .map(Patch.lint)
 
     patches.asPatch
   }
 
-  private def isCaseClassDefn(tree: Tree): Boolean = {
-    tree match {
-      case classDefn: Defn.Class if classDefn.mods.exists(isCase) => true
-      case _                                                      => false
-    }
+  private def isCaseClassDefn(tree: Tree): Boolean = tree match {
+    case classDefn: Defn.Class if classDefn.mods.exists(isCase) => true
+    case _                                                      => false
   }
 
   // See https://github.com/scalameta/scalameta/issues/467
@@ -80,12 +75,10 @@ final class NestedCaseClasses extends SyntacticRule("NestedCaseClasses") {
     case _         => false
   }
 
-  private def isClassOrTraitDefn(tree: Tree): Boolean = {
-    tree match {
-      case _: Defn.Class => true
-      case _: Defn.Trait => true
-      case _             => false
-    }
+  private def isClassOrTraitDefn(tree: Tree): Boolean = tree match {
+    case _: Defn.Class => true
+    case _: Defn.Trait => true
+    case _             => false
   }
 
   private def filterAncestorsOrSelf[A <: Tree: ClassTag](tree: Tree, p: A => Boolean): List[A] = {
