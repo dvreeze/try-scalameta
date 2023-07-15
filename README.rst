@@ -173,10 +173,23 @@ phase mostly prepare generation of executable code (class files). Although I can
 for `TASTy`_, I'm not sure where TASTy output generation fits in the almost 25 compilation phases.
 
 It makes sense to spend some time reading the `SemanticDB Specification`_. First it is important
-to get a feel for the terminology, like (typed) *Tree*, *Symbol*, *Type*, *SymbolInformation*, etc.
+to get a feel for the terminology, like (typed) *Tree*, *Type*, *Symbol*, *SymbolInformation*, etc.
 When tree nodes have symbols attached to them, we can relate references to definitions, both having the
 same symbol attached to them. After a first cursory read it makes sense to read this specification in more detail,
 and to use it as reference material when using SemanticDB.
+
+See for example the following line of code, which requires an implicit *SemanticDocument*::
+
+    val signature = tree.symbol.info.signature
+
+So, given an implicit *SemanticDocument* (for the source file), we can obtain the symbol for any syntax tree (node).
+The symbol refers to a uniquely named type definition, function definition, etc., and is a "no-symbol" otherwise,
+if the tree has no associated name. So symbols associate uses of types, functions etc. with their definitions.
+Zooming in, from the symbol the *SymbolInformation* is obtained. It tells us more about the kind of symbol and provides
+some more details. Zooming in further, the *Signature* is obtained, which for classes, methods, types etc. provides details
+about their signature, in terms of *SymbolInformation* and *SemanticType*s. So this gives an idea about how syntactic
+trees and the associated semantic information hang together. Of course, if the tree has no symbol, there is no point
+in zooming in further for semantic information or even signatures.
 
 One relatively easy way to use SemanticDB models in static code analysis tasks is to do so
 via `Scalafix`_, even if Scalafix is not used for refactoring or linting. Still, Scalafix can be handy, because it
@@ -189,10 +202,10 @@ run it. The most important downside of this approach is that such a rule impleme
 than Scalafix (so it can depend only on Scalafix, Scalameta, `metaconfig`_, and the standard Scala and Java APIs).
 
 Obviously, the projects against which (semantic) Scalafix rules are run must be set up to generate SemanticDB
-output. Assuming that SemanticDB output has been generated (if needed), Scalafix rules can be run from source code
+output. Assuming that SemanticDB output has been generated (if needed), Scalafix rules can be run from (rule) source code
 as follows (on the command line)::
 
-    scalafix --rules=file:/path/to/rule-implementation \
+    scalafix --rules=file:/path/to/rule-implementation-scala-source-file \
       --config=/path/to/config-file \
       --classpath=./target/classes/meta \
       --files=/path/to/source-directory-1-to-include \
