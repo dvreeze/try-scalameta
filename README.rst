@@ -187,7 +187,7 @@ The symbol refers to a uniquely named type definition, function definition, etc.
 if the tree has no associated name. So symbols associate uses of types, functions etc. with their definitions.
 Zooming in, from the symbol the *SymbolInformation* is obtained. It tells us more about the kind of symbol and provides
 some more details. Zooming in further, the *Signature* is obtained, which for classes, methods, types etc. provides details
-about their signature, in terms of *SymbolInformation* and *SemanticType*s. So this gives an idea about how syntactic
+about their signature, in terms of *SymbolInformation* and *SemanticType* instances. So this gives an idea about how syntactic
 trees and the associated semantic information hang together. Of course, if the tree has no symbol, there is no point
 in zooming in further for semantic information or even signatures.
 
