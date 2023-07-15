@@ -30,15 +30,7 @@ import scalafix.v1.SyntacticRule
  * have state depending on state of an encapsulating instance of a trait or class, after all.
  *
  * This "rule" only depends on the Scala standard library and on Scalafix (and therefore Scalameta) and nothing else, so
- * this rule can easily be run from its source path against sbt or Maven projects. For example: "scalafix
- * --rules=file:/path/to/NestedCaseClasses.scala --config=/path/to/scalafix-config-file --classpath=./target/classes"
- *
- * The classpath configuration option should point to the parent directory of a "META-INF/semanticdb/src/main/scala"
- * directory, where the "*.scala.semanticdb" files live.
- *
- * With "-f" or "--files" (once or more) specific (relative) Scala source directories can be chosen.
- *
- * See https://scalacenter.github.io/scalafix/docs/users/installation.html#command-line for more information.
+ * this rule can easily be run from its source path against sbt or Maven projects.
  *
  * @author
  *   Chris de Vreeze

@@ -32,21 +32,7 @@ import scalafix.v1._
  * returned, without following any inheritance chains.
  *
  * This "rule" only depends on the Scala standard library and on Scalafix (and therefore Scalameta) and nothing else, so
- * this rule can easily be run from its source path against sbt or Maven projects. For example: "scalafix
- * --rules=file:/path/to/ShowClassUsage.scala --config=/path/to/scalafix-config-file --classpath=./target/classes"
- *
- * The classpath configuration option should point to the parent directory of a "META-INF/semanticdb/src/main/scala"
- * directory, where the "*.scala.semanticdb" files live.
- *
- * With "-f" or "--files" (once or more) specific (relative) Scala source directories can be chosen.
- *
- * See https://scalacenter.github.io/scalafix/docs/users/installation.html#command-line for more information.
- *
- * To run this semantic rule, first make sure that the Scala compiler has emitted "*.semanticdb" files. See for example
- * https://scalacenter.github.io/scalafix/docs/users/installation.html for sbt, and
- * https://github.com/evis/scalafix-maven-plugin for Maven. Only the semanticdb-scalac compiler plugin configuration is
- * needed, if scalafix is run directly from the command line. Just don't forget to compile first before running the
- * semantic "rule", or else it misses the needed "*.semanticdb" files as input.
+ * this rule can easily be run from its source path against sbt or Maven projects.
  *
  * @author
  *   Chris de Vreeze

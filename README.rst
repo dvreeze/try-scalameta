@@ -178,7 +178,13 @@ When tree nodes have symbols attached to them, we can relate references to defin
 same symbol attached to them. After a first cursory read it makes sense to read this specification in more detail,
 and to use it as reference material when using SemanticDB.
 
-See for example the following line of code, which requires an implicit *SemanticDocument*::
+One relatively easy way to use SemanticDB models in static code analysis tasks is to do so
+via `Scalafix`_, even if Scalafix is not used for refactoring or linting. Still, Scalafix can be handy, because it
+supports the SemanticDB model well in its API, and it takes many of the "bootstrapping challenges"
+away. See also the `Scalafix API Overview`_. Many Scalafix key data structures clearly correspond
+to SemanticDB concepts, e.g. symbols and symbol information.
+
+See for example the following line of code, which requires an implicit *SemanticDocument* (from the scalafix library)::
 
     val signature = tree.symbol.info.signature
 
@@ -190,12 +196,6 @@ some more details. Zooming in further, the *Signature* is obtained, which for cl
 about their signature, in terms of *SymbolInformation* and *SemanticType* instances. So this gives an idea about how syntactic
 trees and the associated semantic information hang together. Of course, if the tree has no symbol, there is no point
 in zooming in further for semantic information or even signatures.
-
-One relatively easy way to use SemanticDB models in static code analysis tasks is to do so
-via `Scalafix`_, even if Scalafix is not used for refactoring or linting. Still, Scalafix can be handy, because it
-supports the SemanticDB model well in its API, and it takes many of the "bootstrapping challenges"
-away. See also the `Scalafix API Overview`_. Many Scalafix key data structures clearly correspond
-to SemanticDB concepts, e.g. symbols and symbol information.
 
 It is possible to `run ad-hoc Scalafix rules from source code`_. Scalafix will then first compile the rule and then
 run it. The most important downside of this approach is that such a rule implementation may not have any other dependencies
@@ -212,8 +212,9 @@ as follows (on the command line)::
       --files=/path/to/source-directory-2-to-include
 
 The "classpath" setting must point to the parent directory of "META-INF/semanticdb", so typically of
-"META-INF/semanticdb/src/main/scala". The optional "files" settings can be used to control exactly which
-source directories are in scope.
+"META-INF/semanticdb/src/main/scala" (where the generated "*.scala.semanticdb" files live). The optional "files"
+settings can be used to control exactly which source directories are in scope as input for the scalafix rules.
+See for example `scalafix CLI`_.
 
 Hence, with a small collection of ad-hoc Scalafix rules and corresponding config files, meta-programming
 can be applied to large code bases, provided their builds are set up to generate SemanticDB output
@@ -251,5 +252,6 @@ those REPL sessions, or can be used for inspiration.
 .. _`Scalafix API Overview`: https://scalacenter.github.io/scalafix/docs/developers/api.html
 .. _`run ad-hoc Scalafix rules from source code`: https://scalacenter.github.io/scalafix/docs/developers/tutorial.html#run-the-rule-from-source-code
 .. _`metaconfig`: https://scalameta.org/metaconfig/docs/getting-started.html
+.. _`scalafix CLI`: https://scalacenter.github.io/scalafix/docs/users/installation.html#command-line
 .. _`as sbt`: https://scalacenter.github.io/scalafix/docs/users/installation.html
 .. _`as Maven`: https://github.com/evis/scalafix-maven-plugin
