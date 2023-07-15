@@ -212,7 +212,7 @@ as follows (on the command line)::
       --files=/path/to/source-directory-2-to-include
 
 The "classpath" setting must point to the parent directory of "META-INF/semanticdb", so typically of
-"META-INF/semanticdb/src/main/scala" (where the generated "*.scala.semanticdb" files live). The optional "files"
+"META-INF/semanticdb/src/main/scala" (where the generated "**.scala.semanticdb" files live). The optional "files"
 settings can be used to control exactly which source directories are in scope as input for the scalafix rules.
 See for example `scalafix CLI`_.
 
