@@ -57,6 +57,7 @@ final class ShowSymbols extends SemanticRule("ShowSymbols") {
     println(s"Kind of tree (class name): ${t.getClass.getSimpleName}")
     println(s"Syntax: ${printSyntax(t)}")
     println(s"Symbol: ${t.symbol}")
+    println(s"Symbol display name: ${t.symbol.displayName}")
     println(s"Symbol owner: ${t.symbol.owner}")
 
     t.symbol.info.foreach { symbolInfo =>

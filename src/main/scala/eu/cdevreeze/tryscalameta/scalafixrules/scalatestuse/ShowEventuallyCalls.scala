@@ -20,7 +20,6 @@ import java.nio.file.Path
 import java.nio.file.Paths
 
 import scala.meta.Term
-import scala.meta.Term.Apply
 import scala.meta.Tree
 import scala.meta.inputs.Input
 import scala.reflect.ClassTag
@@ -65,7 +64,7 @@ final class ShowEventuallyCalls extends SemanticRule("ShowEventuallyCalls") {
         }
 
         val functionCalls: Seq[Term.Apply] =
-          filterDescendants[Term.Apply](eventuallyCall, t => isScalaFunction(t.symbol))
+          filterDescendants[Term.Apply](eventuallyCall, t => isScalaFunctionWithKnownSymbolInfo(t.symbol))
 
         functionCalls.foreach { functionCall =>
           println(
@@ -89,13 +88,11 @@ final class ShowEventuallyCalls extends SemanticRule("ShowEventuallyCalls") {
   }
 
   private def isEventuallyFunction(symbol: Symbol)(implicit doc: SemanticDocument): Boolean = {
-    symbol.owner.toString.contains("scalatest") &&
-    symbol.info.exists { symbolInfo =>
-      symbolInfo.isScala && symbolInfo.isDef && symbolInfo.displayName == "eventually"
-    }
+    // Not investigating potentially absent SymbolInformation
+    symbol.displayName == "eventually" && symbol.owner.toString == "org/scalatest/concurrent/Eventually#"
   }
 
-  private def isScalaFunction(symbol: Symbol)(implicit doc: SemanticDocument): Boolean = {
+  private def isScalaFunctionWithKnownSymbolInfo(symbol: Symbol)(implicit doc: SemanticDocument): Boolean = {
     symbol.info.exists { symbolInfo =>
       symbolInfo.isScala && symbolInfo.isDef
     }
