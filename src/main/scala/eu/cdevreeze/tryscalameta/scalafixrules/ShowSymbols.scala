@@ -59,6 +59,21 @@ final class ShowSymbols extends SemanticRule("ShowSymbols") {
     println(s"Symbol: ${t.symbol}")
     println(s"Symbol owner: ${t.symbol.owner}")
 
+    t.symbol.info.foreach { symbolInfo =>
+      println(s"Symbol information displayName: ${symbolInfo.displayName}")
+      println(s"Symbol information isScala:     ${symbolInfo.isScala}")
+      println(s"Symbol information isClass:     ${symbolInfo.isClass}")
+      println(s"Symbol information isTrait:     ${symbolInfo.isTrait}")
+      println(s"Symbol information isObject:    ${symbolInfo.isObject}")
+      println(s"Symbol information isInterface: ${symbolInfo.isInterface}")
+      println(s"Symbol information isType:      ${symbolInfo.isType}")
+      println(s"Symbol information isDef:       ${symbolInfo.isDef}")
+      println(s"Symbol information isVal:       ${symbolInfo.isVal}")
+      println(s"Symbol information isVar:       ${symbolInfo.isVar}")
+      println(s"Symbol information isMethod:    ${symbolInfo.isMethod}")
+      println(s"Symbol information signature:   ${symbolInfo.signature}")
+    }
+
     t match {
       case t: Stat =>
         println(s"isTopLevelStat: ${t.isTopLevelStat}")

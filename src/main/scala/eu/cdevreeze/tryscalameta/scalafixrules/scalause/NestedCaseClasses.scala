@@ -29,7 +29,7 @@ import scalafix.v1.SyntacticRule
  * Checks nested case classes for not being nested inside traits or classes. It is rather strange for case classes to
  * have state depending on state of an encapsulating instance of a trait or class, after all.
  *
- * This "rule" only depends on the Scala standard library and on Scalafix (and therefore Scalameta) and nothing else, so
+ * This rule only depends on the Scala standard library and on Scalafix (and therefore Scalameta) and nothing else, so
  * this rule can easily be run from its source path against sbt or Maven projects.
  *
  * @author
