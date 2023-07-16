@@ -186,7 +186,7 @@ to SemanticDB concepts, e.g. symbols and symbol information.
 
 See for example the following line of code, which requires an implicit *SemanticDocument* (from the scalafix library)::
 
-    val signature = tree.symbol.info.signature
+    val signatureOpt = tree.symbol.info.flatMap(_.signature)
 
 So, given an implicit *SemanticDocument* (for the source file), we can obtain the symbol for any syntax tree (node).
 The symbol refers to a uniquely named type definition, function definition, etc., and is a "no-symbol" otherwise,
@@ -195,7 +195,7 @@ Zooming in, from the symbol the *SymbolInformation* is obtained. It tells us mor
 some more details. Zooming in further, the *Signature* is obtained, which for classes, methods, types etc. provides details
 about their signature, in terms of *SymbolInformation* and *SemanticType* instances. So this gives an idea about how syntactic
 trees and the associated semantic information hang together. Of course, if the tree has no symbol, there is no point
-in zooming in further for semantic information or even signatures.
+in trying to zoom in further for semantic information or even signatures.
 
 It is possible to `run ad-hoc Scalafix rules from source code`_. Scalafix will then first compile the rule and then
 run it. The most important downside of this approach is that such a rule implementation may not have any other dependencies
