@@ -23,7 +23,6 @@ import scala.meta.Term
 import scala.meta.Tree
 import scala.meta.inputs.Input
 import scala.reflect.ClassTag
-import scala.util.Try
 import scala.util.chaining.scalaUtilChainingOps
 
 import scalafix.patch.Patch
@@ -68,7 +67,10 @@ final class ShowEventuallyCalls extends SemanticRule("ShowEventuallyCalls") {
         }
 
         val functionCalls: Seq[Term.Apply] =
-          filterDescendants[Term.Apply](eventuallyCall, t => isCompleteFunctionCall(t) && isProbablyFunction(t.symbol))
+          filterDescendants[Term.Apply](
+            eventuallyCall,
+            t => isCompleteFunctionCall(t) && isProbablyNonStdlibFunction(t.symbol)
+          )
 
         functionCalls.foreach { functionCall =>
           println(
@@ -96,6 +98,10 @@ final class ShowEventuallyCalls extends SemanticRule("ShowEventuallyCalls") {
         }
       ).isEmpty
     }
+  }
+
+  private def isProbablyNonStdlibFunction(symbol: Symbol): Boolean = {
+    isProbablyFunction(symbol) && !symbol.toString.startsWith("scala/") && !symbol.toString.startsWith("java/")
   }
 
   private def isProbablyFunction(symbol: Symbol): Boolean = {
