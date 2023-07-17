@@ -55,7 +55,7 @@ final class ShowEventuallyCalls extends SemanticRule("ShowEventuallyCalls") {
       }
 
       eventuallyCalls.foreach { eventuallyCall =>
-        println(s"\"eventually\" call at ${eventuallyCall.pos}")
+        println(s"\"eventually\" call at ${eventuallyCall.pos.pipe(pos => s"[${pos.startLine}..${pos.endLine}]")}")
 
         val syntacticallyNestedEventuallyCalls =
           filterDescendants[Term.Apply](eventuallyCall, t => isEventuallyFunction(t.symbol))
