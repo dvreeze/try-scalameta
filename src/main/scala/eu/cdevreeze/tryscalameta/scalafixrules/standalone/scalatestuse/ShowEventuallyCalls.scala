@@ -51,21 +51,24 @@ final class ShowEventuallyCalls extends SemanticRule("ShowEventuallyCalls") {
       println(s"Investigating file $fileName, which contains an \"eventually\" call ...")
 
       val eventuallyCalls: Seq[Term.Apply] = {
-        filterDescendants[Term.Apply](doc.tree, t => isEventuallyFunction(t.symbol))
+        filterDescendants[Term.Apply](doc.tree, t => isCompleteFunctionCall(t) && isEventuallyFunction(t.symbol))
       }
 
       eventuallyCalls.foreach { eventuallyCall =>
         println(s"\"eventually\" call at ${eventuallyCall.pos.pipe(pos => s"[${pos.startLine}..${pos.endLine}]")}")
 
         val syntacticallyNestedEventuallyCalls =
-          filterDescendants[Term.Apply](eventuallyCall, t => isEventuallyFunction(t.symbol))
+          filterDescendants[Term.Apply](
+            eventuallyCall,
+            t => isCompleteFunctionCall(t) && isEventuallyFunction(t.symbol)
+          )
 
         if (syntacticallyNestedEventuallyCalls.nonEmpty) {
           println(s"It has syntactically nested \"eventually\" calls!!")
         }
 
         val functionCalls: Seq[Term.Apply] =
-          filterDescendants[Term.Apply](eventuallyCall, t => isScalaFunctionWithKnownSymbolInfo(t.symbol))
+          filterDescendants[Term.Apply](eventuallyCall, t => isCompleteFunctionCall(t) && isProbablyFunction(t.symbol))
 
         functionCalls.foreach { functionCall =>
           println(
@@ -78,6 +81,30 @@ final class ShowEventuallyCalls extends SemanticRule("ShowEventuallyCalls") {
     Patch.empty
   }
 
+  private def isEventuallyFunction(symbol: Symbol)(implicit doc: SemanticDocument): Boolean = {
+    // Not investigating potentially absent SymbolInformation
+    symbol.displayName == "eventually" && symbol.owner.toString == "org/scalatest/concurrent/Eventually#"
+  }
+
+  private def isCompleteFunctionCall(t: Term.Apply)(implicit doc: SemanticDocument): Boolean = {
+    isProbablyFunction(t.symbol) && {
+      // Returns true if this is a function call with the complete argument lists, and not just its first "same function" call ancestor leaving out the last argument list
+      filterAncestors[Term.Apply](
+        t,
+        { ancestor =>
+          ancestor.symbol == t.symbol && ancestor.pos.startLine == t.pos.startLine && ancestor.pos.startColumn == t.pos.startColumn
+        }
+      ).isEmpty
+    }
+  }
+
+  private def isProbablyFunction(symbol: Symbol): Boolean = {
+    // This circumvents potentially failing attempts to get the optional SymbolInformation (outside the current implicit SemanticDocument).
+    symbol.toString.contains('(') && symbol.toString.contains(')')
+  }
+
+  // Tree navigation support
+
   private def filterDescendantsOrSelf[A <: Tree: ClassTag](tree: Tree, p: A => Boolean): List[A] = {
     val optSelf: List[A] = List(tree).collect { case t: A if p(t) => t }
     // Recursive
@@ -88,16 +115,14 @@ final class ShowEventuallyCalls extends SemanticRule("ShowEventuallyCalls") {
     tree.children.flatMap(ch => filterDescendantsOrSelf[A](ch, p))
   }
 
-  private def isEventuallyFunction(symbol: Symbol)(implicit doc: SemanticDocument): Boolean = {
-    // Not investigating potentially absent SymbolInformation
-    symbol.displayName == "eventually" && symbol.owner.toString == "org/scalatest/concurrent/Eventually#"
+  private def filterAncestorsOrSelf[A <: Tree: ClassTag](tree: Tree, p: A => Boolean): List[A] = {
+    val optSelf: List[A] = List(tree).collect { case t: A if p(t) => t }
+    // Recursive
+    tree.parent.toList.flatMap(parent => filterAncestorsOrSelf[A](parent, p)).prependedAll(optSelf)
   }
 
-  private def isScalaFunctionWithKnownSymbolInfo(symbol: Symbol)(implicit doc: SemanticDocument): Boolean = {
-    // Call "symbol.info" may fail (when?)
-    Try(symbol.info).toOption.flatten.exists { symbolInfo =>
-      symbolInfo.isScala && symbolInfo.isDef
-    }
+  private def filterAncestors[A <: Tree: ClassTag](tree: Tree, p: A => Boolean): List[A] = {
+    tree.parent.toList.flatMap(parent => filterAncestorsOrSelf[A](parent, p))
   }
 
 }
