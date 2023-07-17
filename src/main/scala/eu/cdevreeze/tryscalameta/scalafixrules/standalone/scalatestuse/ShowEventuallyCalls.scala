@@ -83,7 +83,7 @@ final class ShowEventuallyCalls extends SemanticRule("ShowEventuallyCalls") {
     Patch.empty
   }
 
-  private def isEventuallyFunction(symbol: Symbol)(implicit doc: SemanticDocument): Boolean = {
+  private def isEventuallyFunction(symbol: Symbol): Boolean = {
     // Not investigating potentially absent SymbolInformation
     symbol.displayName == "eventually" && symbol.owner.toString == "org/scalatest/concurrent/Eventually#"
   }
