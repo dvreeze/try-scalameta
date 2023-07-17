@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package eu.cdevreeze.tryscalameta.scalafixrules.scalause
+package eu.cdevreeze.tryscalameta.scalafixrules.standalone.scalause
 
 import scala.meta._
 import scala.reflect.ClassTag

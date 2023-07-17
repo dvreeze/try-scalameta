@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package eu.cdevreeze.tryscalameta.scalafixrules.scalatestuse
+package eu.cdevreeze.tryscalameta.scalafixrules.standalone.scalatestuse
 
 import java.nio.file.Path
 import java.nio.file.Paths
@@ -23,6 +23,7 @@ import scala.meta.Term
 import scala.meta.Tree
 import scala.meta.inputs.Input
 import scala.reflect.ClassTag
+import scala.util.Try
 import scala.util.chaining.scalaUtilChainingOps
 
 import scalafix.patch.Patch
@@ -49,8 +50,8 @@ final class ShowEventuallyCalls extends SemanticRule("ShowEventuallyCalls") {
       println()
       println(s"Investigating file $fileName, which contains an \"eventually\" call ...")
 
-      val eventuallyCalls: Seq[Term.Apply] = doc.tree.collect {
-        case t: Term.Apply if isEventuallyFunction(t.symbol) => t
+      val eventuallyCalls: Seq[Term.Apply] = {
+        filterDescendants[Term.Apply](doc.tree, t => isEventuallyFunction(t.symbol))
       }
 
       eventuallyCalls.foreach { eventuallyCall =>
@@ -93,7 +94,8 @@ final class ShowEventuallyCalls extends SemanticRule("ShowEventuallyCalls") {
   }
 
   private def isScalaFunctionWithKnownSymbolInfo(symbol: Symbol)(implicit doc: SemanticDocument): Boolean = {
-    symbol.info.exists { symbolInfo =>
+    // Call "symbol.info" may fail (when?)
+    Try(symbol.info).toOption.flatten.exists { symbolInfo =>
       symbolInfo.isScala && symbolInfo.isDef
     }
   }

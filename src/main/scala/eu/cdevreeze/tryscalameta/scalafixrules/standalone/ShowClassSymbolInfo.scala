@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package eu.cdevreeze.tryscalameta.scalafixrules
+package eu.cdevreeze.tryscalameta.scalafixrules.standalone
 
 import java.nio.file.Path
 import java.nio.file.Paths

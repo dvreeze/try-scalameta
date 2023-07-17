@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package eu.cdevreeze.tryscalameta.scalafixrules
+package eu.cdevreeze.tryscalameta.scalafixrules.standalone
 
 import java.nio.file.Path
 import java.nio.file.Paths
@@ -28,8 +28,8 @@ import metaconfig.generic.Surface
 import scalafix.v1._
 
 /**
- * Shows usage of public classes/traits/objects whose symbols are passed as configuration data. Only exact matches are
- * returned, without following any inheritance chains.
+ * Shows usage of public methods whose symbols are passed as configuration data. Only exact matches are returned,
+ * without following any inheritance chains.
  *
  * This "rule" only depends on the Scala standard library and on Scalafix (and therefore Scalameta) and nothing else, so
  * this rule can easily be run from its source path against sbt or Maven projects.
@@ -37,34 +37,34 @@ import scalafix.v1._
  * @author
  *   Chris de Vreeze
  */
-final class ShowClassUsage(val config: UsedClassConfig) extends SemanticRule("ShowClassUsage") {
+final class ShowMethodUsage(val config: UsedMethodConfig) extends SemanticRule("ShowMethodUsage") {
 
-  def this() = this(UsedClassConfig.default)
+  def this() = this(UsedMethodConfig.default)
 
   override def withConfiguration(config: Configuration): Configured[Rule] =
     config.conf
-      .getOrElse("ShowClassUsage")(this.config)
-      .map(newConfig => new ShowClassUsage(newConfig))
+      .getOrElse("ShowMethodUsage")(this.config)
+      .map(newConfig => new ShowMethodUsage(newConfig))
 
   override def fix(implicit doc: SemanticDocument): Patch = {
     if (config.isEmpty) {
-      println("Missing classSymbols (symbols of classes/traits/objects). Doing nothing.")
+      println("Missing methodSymbols (symbols of methods). Doing nothing.")
       Patch.empty
     } else {
       // Replacing ".." in HOCON by "#"
-      val classSymbols: Set[Symbol] =
-        config.classSymbols.ensuring(_.nonEmpty).map(_.replace("..", "#")).map(Symbol.apply).toSet
+      val methodSymbols: Seq[Symbol] =
+        config.methodSymbols.ensuring(_.nonEmpty).map(_.replace("..", "#")).map(Symbol.apply)
 
-      classSymbols.foreach(checkClassSymbol)
+      methodSymbols.foreach(checkMethodSymbol)
 
-      val symbolMatcher: SymbolMatcher = classSymbols.map(s => SymbolMatcher.exact(s.toString)).reduce(_ + _)
+      val symbolMatcher: SymbolMatcher = methodSymbols.map(s => SymbolMatcher.exact(s.toString)).reduce(_ + _)
 
       val matchingTrees: Seq[Tree] = doc.tree.collect { case t: Tree if symbolMatcher.matches(t) => t }
 
       val fileName: Path = doc.input.asInstanceOf[Input.VirtualFile].path.pipe(Paths.get(_)).getFileName
 
       println()
-      println(s"Usage of classes/traits/objects (one of ${classSymbols.mkString(", ")}) in file $fileName:")
+      println(s"Usage of methods (one of ${methodSymbols.mkString(", ")}) in file $fileName:")
 
       if (matchingTrees.isEmpty) {
         println("No usage found")
@@ -104,9 +104,9 @@ final class ShowClassUsage(val config: UsedClassConfig) extends SemanticRule("Sh
     println(messagePrefix + s"Symbol owner: ${tree.symbol.owner}")
   }
 
-  private def checkClassSymbol(sym: Symbol)(implicit doc: SemanticDocument): Unit = {
-    require(sym.info.forall(s => s.isClass || s.isTrait || s.isObject), s"Not a class/trait/object: $sym")
-    require(sym.info.forall(_.isPublic), s"Not a public class/trait/object: $sym")
+  private def checkMethodSymbol(sym: Symbol)(implicit doc: SemanticDocument): Unit = {
+    require(sym.info.forall(_.isMethod), s"Not a method: $sym")
+    require(sym.info.forall(_.isPublic), s"Not a public method: $sym")
   }
 
   private def printSyntax(t: Tree): String = {
@@ -119,12 +119,12 @@ final class ShowClassUsage(val config: UsedClassConfig) extends SemanticRule("Sh
 
 }
 
-final case class UsedClassConfig(classSymbols: List[String] = Nil) {
-  def isEmpty: Boolean = classSymbols.isEmpty
+final case class UsedMethodConfig(methodSymbols: List[String] = Nil) {
+  def isEmpty: Boolean = methodSymbols.isEmpty
 }
 
-object UsedClassConfig {
-  val default: UsedClassConfig = UsedClassConfig()
-  implicit val surface: Surface[UsedClassConfig] = metaconfig.generic.deriveSurface[UsedClassConfig]
-  implicit val decoder: ConfDecoder[UsedClassConfig] = metaconfig.generic.deriveDecoder(default)
+object UsedMethodConfig {
+  val default: UsedMethodConfig = UsedMethodConfig()
+  implicit val surface: Surface[UsedMethodConfig] = metaconfig.generic.deriveSurface[UsedMethodConfig]
+  implicit val decoder: ConfDecoder[UsedMethodConfig] = metaconfig.generic.deriveDecoder(default)
 }
