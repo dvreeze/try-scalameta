@@ -85,7 +85,7 @@ final class ShowEventuallyCalls extends SemanticRule("ShowEventuallyCalls") {
 
   private def isEventuallyFunction(symbol: Symbol): Boolean = {
     // Not investigating potentially absent SymbolInformation
-    symbol.displayName == "eventually" && symbol.owner.toString == "org/scalatest/concurrent/Eventually#"
+    SymbolMatcher.normalized("org.scalatest.concurrent.Eventually.eventually").matches(symbol)
   }
 
   private def isCompleteFunctionCall(t: Term.Apply)(implicit doc: SemanticDocument): Boolean = {
@@ -106,7 +106,7 @@ final class ShowEventuallyCalls extends SemanticRule("ShowEventuallyCalls") {
 
   private def isProbablyFunction(symbol: Symbol): Boolean = {
     // This circumvents potentially failing attempts to get the optional SymbolInformation (outside the current implicit SemanticDocument).
-    symbol.toString.contains('(') && symbol.toString.contains(')')
+    symbol.toString.count(_ == '(') == 1 && symbol.toString.count(_ == ')') == 1
   }
 
   // Tree navigation support
