@@ -44,7 +44,7 @@ final class ShowTree extends SyntacticRule("ShowTree") {
     println(s"File: $fileName")
 
     println()
-    println(doc.tree.structureWidth(80))
+    println(doc.tree.structureLabeled(80))
 
     Patch.empty
   }
