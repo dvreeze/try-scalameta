@@ -201,17 +201,23 @@ It is possible to `run ad-hoc Scalafix rules from source code`_. Scalafix will t
 run it. The most important downside of this approach is that such a rule implementation may not have any other dependencies
 than Scalafix (so it can depend only on Scalafix, Scalameta, `metaconfig`_, and the standard Scala and Java APIs).
 
+Before running the scalafix command from the command line, generate a classpath string. In a Maven project it can be done like so::
+
+    mvn dependency:build-classpath | grep -v INFO > ./cp.txt
+
+Check the generated file in that it only contains a classpath string, no more, no less.
+
 Obviously, the projects against which (semantic) Scalafix rules are run must be set up to generate SemanticDB
 output. Assuming that SemanticDB output has been generated (if needed), Scalafix rules can be run from (rule) source code
 as follows (on the command line)::
 
     scalafix --rules=file:/path/to/rule-implementation-scala-source-file \
       --config=/path/to/config-file \
-      --classpath=./target/classes/meta \
+      --classpath=./target/classes/meta:$(cat ./cp.txt) \
       --files=/path/to/source-directory-1-to-include \
       --files=/path/to/source-directory-2-to-include
 
-The "classpath" setting must point to the parent directory of "META-INF/semanticdb", so typically of
+The "classpath" setting must include the parent directory/directories of "META-INF/semanticdb", so typically of
 "META-INF/semanticdb/src/main/scala" (where the generated "\*.scala.semanticdb" files live). The optional "files"
 settings can be used to control exactly which source directories are in scope as input for the scalafix rules.
 See for example `scalafix CLI`_.
