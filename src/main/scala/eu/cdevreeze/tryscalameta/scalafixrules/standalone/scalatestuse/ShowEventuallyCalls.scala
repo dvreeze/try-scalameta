@@ -69,7 +69,7 @@ final class ShowEventuallyCalls extends SemanticRule("ShowEventuallyCalls") {
         val functionCalls: Seq[Term.Apply] =
           filterDescendants[Term.Apply](
             eventuallyCall,
-            t => isCompleteFunctionCall(t) && isProbablyNonStdlibFunction(t.symbol)
+            t => isCompleteFunctionCall(t) && isNonStdlibNonScalatestFunction(t.symbol)
           )
 
         functionCalls.foreach { functionCall =>
@@ -89,7 +89,7 @@ final class ShowEventuallyCalls extends SemanticRule("ShowEventuallyCalls") {
   }
 
   private def isCompleteFunctionCall(t: Term.Apply)(implicit doc: SemanticDocument): Boolean = {
-    isProbablyFunction(t.symbol) && {
+    isFunction(t.symbol) && {
       // Returns true if this is a function call with the complete argument lists, and not just its first "same function" call ancestor leaving out the last argument list
       filterAncestors[Term.Apply](
         t,
@@ -100,13 +100,15 @@ final class ShowEventuallyCalls extends SemanticRule("ShowEventuallyCalls") {
     }
   }
 
-  private def isProbablyNonStdlibFunction(symbol: Symbol): Boolean = {
-    isProbablyFunction(symbol) && !symbol.toString.startsWith("scala/") && !symbol.toString.startsWith("java/")
+  private def isNonStdlibNonScalatestFunction(symbol: Symbol)(implicit document: SemanticDocument): Boolean = {
+    isFunction(symbol) && !symbol.toString.startsWith("scala/") && !symbol.toString.startsWith(
+      "java/"
+    ) && !symbol.toString.startsWith("org/scalatest/")
   }
 
-  private def isProbablyFunction(symbol: Symbol): Boolean = {
-    // This circumvents potentially failing attempts to get the optional SymbolInformation (outside the current implicit SemanticDocument).
-    symbol.toString.count(_ == '(') == 1 && symbol.toString.count(_ == ')') == 1
+  private def isFunction(symbol: Symbol)(implicit doc: SemanticDocument): Boolean = {
+    // In order for "symbol.info" not to throw any exception, make sure scalafix runs with a complete classpath
+    symbol.info.exists(_.isDef)
   }
 
   // Tree navigation support
