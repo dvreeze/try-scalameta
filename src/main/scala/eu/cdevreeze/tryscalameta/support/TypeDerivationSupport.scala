@@ -28,22 +28,22 @@ import scalafix.v1._
  */
 object TypeDerivationSupport {
 
-  def getParentSymbolsOrSelf(symbol: Symbol)(implicit doc: SemanticDocument): Set[Symbol] = {
+  def getParentSymbolsOrSelf(symbol: Symbol)(implicit doc: SemanticDocument): List[Symbol] = {
     symbol.info match {
-      case None => Set(symbol)
+      case None => List(symbol)
       case Some(symbolInfo) =>
         symbolInfo.signature match {
           case ClassSignature(_, parents, _, _) =>
-            Set(symbol).union {
+            List(symbol).appendedAll {
               parents
                 .collect { case TypeRef(_, parentSymbol, _) =>
                   // Recursive call
                   getParentSymbolsOrSelf(parentSymbol)(doc)
                 }
                 .flatten
-                .toSet
+                .distinct
             }
-          case _ => Set(symbol)
+          case _ => List(symbol)
         }
     }
   }
