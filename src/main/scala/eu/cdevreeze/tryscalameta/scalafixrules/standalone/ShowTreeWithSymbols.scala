@@ -56,9 +56,33 @@ final class ShowTreeWithSymbols extends SemanticRule("ShowTree") {
       val symbol: Symbol = tree.symbol
       val pos: String = s"[${tree.pos.startLine},${tree.pos.startColumn} .. ${tree.pos.endLine},${tree.pos.endColumn}]"
       println(s"Tree ${tree.getClass.getSimpleName} at position $pos has symbol: $symbol")
+
+      if (symbol.info.exists(_.signature.isInstanceOf[ClassSignature])) {
+        println(s"\tSuper-types (or self): ${getParentSymbolsOrSelf(symbol).mkString(", ")}")
+      }
     }
 
     Patch.empty
+  }
+
+  private def getParentSymbolsOrSelf(symbol: Symbol)(implicit doc: SemanticDocument): Set[Symbol] = {
+    symbol.info match {
+      case None => Set(symbol)
+      case Some(symbolInfo) =>
+        symbolInfo.signature match {
+          case ClassSignature(_, parents, _, _) =>
+            Set(symbol).union {
+              parents
+                .collect { case TypeRef(_, parentSymbol, _) =>
+                  // Recursive call
+                  getParentSymbolsOrSelf(parentSymbol)(doc)
+                }
+                .flatten
+                .toSet
+            }
+          case _ => Set(symbol)
+        }
+    }
   }
 
 }
