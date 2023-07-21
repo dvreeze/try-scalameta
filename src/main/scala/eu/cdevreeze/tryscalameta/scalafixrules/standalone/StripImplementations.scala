@@ -22,11 +22,11 @@ import scala.reflect.ClassTag
 import scalafix.v1._
 
 /**
- * Strips implementations of def/val/var definitions. The goal is to get a quick overview of how a certain code base
- * hangs together without being bogged by implementation details. For that, make a copy of that code base and run this
- * rule on that copy. Ideally, the result of this rule still compiles successfully, in order to look at that stripped
- * code base in a Scala IDE. So, to be defensive, definitions are not patched if their types must be inferred instead of
- * them being made explicit.
+ * Strips implementations of topmost def/val/var definitions. The goal is to get a quick overview of how a certain code
+ * base hangs together without being bogged by implementation details. For that, make a copy of that code base and run
+ * this rule on that copy. Ideally, the result of this rule still compiles successfully, in order to look at that
+ * stripped code base in a Scala IDE. So, to be defensive, definitions are not patched if their types must be inferred
+ * instead of them being made explicit.
  *
  * Another subsequent rule could then remove those private members that are not needed for successful compilation. Also,
  * a rule must then run to organise imports etc.
@@ -74,7 +74,7 @@ final class StripImplementations extends SemanticRule("StripImplementation") {
   }
 
   private def processValDefn(defn: Defn.Val)(implicit doc: SemanticDocument): Patch = {
-    if (defn.decltpe.nonEmpty) Patch.replaceTree(defn.rhs, "???") else Patch.empty
+    if (defn.decltpe.nonEmpty) Patch.replaceTree(defn.body, "???") else Patch.empty
   }
 
   private def processVarDefn(defn: Defn.Var)(implicit doc: SemanticDocument): Patch = {
@@ -84,7 +84,17 @@ final class StripImplementations extends SemanticRule("StripImplementation") {
   private def processDefDefn(defn: Defn.Def)(implicit doc: SemanticDocument): Patch = {
     if (defn.decltpe.nonEmpty) {
       val bodyPatch = Patch.replaceTree(defn.body, "???")
-      bodyPatch
+
+      val paramPatches: Seq[Patch] = defn.paramClauseGroups.flatMap { paramClauseGroup =>
+        paramClauseGroup.paramClauses.flatMap { paramClause =>
+          paramClause.values.collect {
+            case param if param.decltpe.nonEmpty && param.default.nonEmpty =>
+              Patch.replaceTree(param.default.get, "???")
+          }
+        }
+      }
+
+      paramPatches.asPatch + bodyPatch
     } else {
       Patch.empty
     }
