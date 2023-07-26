@@ -19,8 +19,7 @@ package eu.cdevreeze.tryscalameta.scalafixrules.standalone.enterpriseuse
 import java.nio.file.Path
 import java.nio.file.Paths
 
-import scala.meta.Defn
-import scala.meta.Tree
+import scala.meta._
 import scala.meta.inputs.Input
 import scala.reflect.ClassTag
 import scala.util.chaining.scalaUtilChainingOps
@@ -50,15 +49,27 @@ final class ShowEnterpriseServices extends SemanticRule("ShowEnterpriseServices"
   }
 
   private def showServletTypes(fileName: Path)(implicit doc: SemanticDocument): Unit = {
-    val defns: Seq[Defn] = filterDescendantsOrSelf[Defn](
+    val defns: Seq[Defn.Class] = filterDescendantsOrSelf[Defn.Class](
       doc.tree,
-      t => getParentSymbolsOrSelf(t.symbol).exists(pt => servletTypeSymbolMatcher.matches(pt))
+      t =>
+        getParentSymbolsOrSelf(t.symbol).exists { pt =>
+          servletTypeSymbolMatcher.matches(pt)
+        } && !t.mods.exists(isAbstract)
     )
 
     defns.foreach { defn =>
       println(s"In file '$fileName' servlet class '${defn.symbol}' found")
-      println(s"\tSuper-types (or self): ${getParentSymbolsOrSelf(defn.symbol)}")
+
+      getParentSymbolsOrSelf(defn.symbol).foreach { superTpe =>
+        println(s"\tSuper-type (or self): $superTpe")
+      }
     }
+  }
+
+  // See https://github.com/scalameta/scalameta/issues/467
+  private def isAbstract(mod: Mod): Boolean = mod match {
+    case mod"abstract" => true
+    case _             => false
   }
 
   private def getParentSymbolsOrSelf(symbol: Symbol)(implicit doc: SemanticDocument): List[Symbol] = {
