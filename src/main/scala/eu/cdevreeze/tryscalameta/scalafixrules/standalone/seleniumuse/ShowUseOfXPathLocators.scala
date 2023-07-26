@@ -44,7 +44,7 @@ final class ShowUseOfXPathLocators extends SemanticRule("ShowUseOfXPathLocators"
   private val byXPathSymbolMatcher: SymbolMatcher = SymbolMatcher.normalized("org.openqa.selenium.By.xpath")
 
   override def fix(implicit doc: SemanticDocument): Patch = {
-    val usesOfByXPath: Seq[Term] = doc.tree.collect { case t: Term if isUseOfXPathLocator(t)(doc) => t }
+    val usesOfByXPath: Seq[Term] = filterDescendantsOrSelf[Term](doc.tree, isUseOfXPathLocator)
 
     val fileName: Path = doc.input.asInstanceOf[Input.VirtualFile].path.pipe(Paths.get(_)).getFileName
 
@@ -73,6 +73,12 @@ final class ShowUseOfXPathLocators extends SemanticRule("ShowUseOfXPathLocators"
   }
 
   // Tree navigation support
+
+  private def filterDescendantsOrSelf[A <: Tree: ClassTag](tree: Tree, p: A => Boolean): List[A] = {
+    val optSelf: List[A] = List(tree).collect { case t: A if p(t) => t }
+    // Recursive
+    tree.children.flatMap(ch => filterDescendantsOrSelf[A](ch, p)).prependedAll(optSelf)
+  }
 
   private def filterAncestorsOrSelf[A <: Tree: ClassTag](tree: Tree, p: A => Boolean): List[A] = {
     val optSelf: List[A] = List(tree).collect { case t: A if p(t) => t }
