@@ -114,9 +114,12 @@ final class ShowEnterpriseServices(val config: EnterpriseServiceConfig) extends 
       }
 
       println(s"\tProtected concrete declared methods:")
-      getDeclaredMethodsOfClass(defn.symbol).filter(_.isProtected).filter(!_.isAbstract).foreach { method =>
-        println(s"\t\t${method.symbol}")
-      }
+      getDeclaredMethodsOfClass(defn.symbol)
+        .filter(m => m.isProtected || m.isProtectedThis || m.isProtectedWithin)
+        .filter(!_.isAbstract)
+        .foreach { method =>
+          println(s"\t\t${method.symbol}")
+        }
     }
   }
 
