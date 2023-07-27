@@ -31,7 +31,8 @@ import scalafix.v1._
 
 /**
  * Shows "enterprise services", such as Servlet implementations, Thrift services, Kafka and RabbitMQ consumer and
- * producer types. This gives a quick overview of which of those services are offered by a code base.
+ * producer types, depending on the configuration. This gives a quick overview of which of those services are offered by
+ * a code base.
  *
  * This "rule" only depends on the Scala standard library and on Scalafix (and therefore Scalameta) and nothing else, so
  * this rule can easily be run from its source path against sbt or Maven projects.
@@ -41,7 +42,7 @@ import scalafix.v1._
  */
 final class ShowEnterpriseServices(val config: EnterpriseServiceConfig) extends SemanticRule("ShowEnterpriseServices") {
 
-  private val servletTypeSymbolMatcher: SymbolMatcher = SymbolMatcher.exact("javax/servlet/http/HttpServlet#")
+  private val servletTypeSymbol: Symbol = Symbol("javax/servlet/http/HttpServlet#")
 
   def this() = this(EnterpriseServiceConfig.default)
 
@@ -68,19 +69,19 @@ final class ShowEnterpriseServices(val config: EnterpriseServiceConfig) extends 
       showServletTypes(fileName)
 
       serviceTypeSymbols.foreach { serviceTpe =>
-        val symbolMatcher = SymbolMatcher.exact(serviceTpe.toString)
-
-        showServiceTypes(symbolMatcher, fileName)(doc)
+        showServiceTypes(serviceTpe, fileName)(doc)
       }
 
       Patch.empty
     }
   }
 
-  private def showServiceTypes(serviceTypeSymbolMatcher: SymbolMatcher, fileName: Path)(implicit
+  private def showServiceTypes(serviceTypeSymbol: Symbol, fileName: Path)(implicit
       doc: SemanticDocument
   ): Unit = {
-    val defns: Seq[Defn.Class] = filterDescendantsOrSelf[Defn.Class](
+    val serviceTypeSymbolMatcher = SymbolMatcher.exact(serviceTypeSymbol.toString)
+
+    val classDefns: Seq[Defn.Class] = filterDescendantsOrSelf[Defn.Class](
       doc.tree,
       t =>
         getParentSymbolsOrSelf(t.symbol).exists { pt =>
@@ -88,8 +89,16 @@ final class ShowEnterpriseServices(val config: EnterpriseServiceConfig) extends 
         } && !t.mods.exists(isAbstract)
     )
 
-    defns.foreach { defn =>
-      println(s"In file '$fileName' '${defn.symbol.displayName}' service class '${defn.symbol}' found")
+    val objectDefns: Seq[Defn.Object] = filterDescendantsOrSelf[Defn.Object](
+      doc.tree,
+      t =>
+        getParentSymbolsOrSelf(t.symbol).exists { pt =>
+          serviceTypeSymbolMatcher.matches(pt)
+        } && !t.mods.exists(isAbstract)
+    )
+
+    classDefns.appendedAll(objectDefns).foreach { defn =>
+      println(s"In file '$fileName' '${serviceTypeSymbol.displayName}' service class '${defn.symbol}' found")
 
       getParentSymbolsOrSelf(defn.symbol).foreach { superTpe =>
         println(s"\tSuper-type (or self): $superTpe")
@@ -98,7 +107,7 @@ final class ShowEnterpriseServices(val config: EnterpriseServiceConfig) extends 
   }
 
   private def showServletTypes(fileName: Path)(implicit doc: SemanticDocument): Unit = {
-    showServiceTypes(servletTypeSymbolMatcher, fileName)(doc)
+    showServiceTypes(servletTypeSymbol, fileName)(doc)
   }
 
   // See https://github.com/scalameta/scalameta/issues/467
