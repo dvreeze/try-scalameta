@@ -42,6 +42,8 @@ final class ShowEnterpriseServices(val config: EnterpriseServiceConfig) extends 
 
   private val servletTypeSymbolMatcher: SymbolMatcher = SymbolMatcher.exact("javax/servlet/http/HttpServlet#")
 
+  def this() = this(EnterpriseServiceConfig.default)
+
   override def fix(implicit doc: SemanticDocument): Patch = {
     if (config.isEmpty) {
       println(
