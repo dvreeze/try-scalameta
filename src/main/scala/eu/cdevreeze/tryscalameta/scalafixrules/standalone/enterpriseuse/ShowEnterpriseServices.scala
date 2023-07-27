@@ -107,6 +107,11 @@ final class ShowEnterpriseServices(val config: EnterpriseServiceConfig) extends 
       getParentSymbolsOrSelf(defn.symbol).foreach { superTpe =>
         println(s"\t\t$superTpe")
       }
+
+      println(s"\tPublic concrete declared methods:")
+      getDeclaredMethodsOfClass(defn.symbol).filter(_.isPublic).filter(!_.isAbstract).foreach { method =>
+        println(s"\t\t${method.symbol}")
+      }
     }
   }
 
@@ -146,6 +151,16 @@ final class ShowEnterpriseServices(val config: EnterpriseServiceConfig) extends 
       s"Not a class/trait/interface: $sym"
     )
     require(sym.info.exists(_.isPublic), s"Not a public class/trait/interface: $sym")
+  }
+
+  private def getDeclaredMethodsOfClass(classSym: Symbol)(implicit doc: SemanticDocument): Seq[SymbolInformation] = {
+    for {
+      classSignature <- classSym.info.map(_.signature).toSeq.collect { case signature: ClassSignature => signature }
+      decl <- classSignature.declarations
+      if decl.isDef || decl.isMethod
+    } yield {
+      decl
+    }
   }
 
   // Tree navigation support
