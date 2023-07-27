@@ -98,10 +98,14 @@ final class ShowEnterpriseServices(val config: EnterpriseServiceConfig) extends 
     )
 
     classDefns.appendedAll(objectDefns).foreach { defn =>
-      println(s"In file '$fileName' '${serviceTypeSymbol.displayName}' service class '${defn.symbol}' found")
+      println()
+      println(s"Service implementation found in file '$fileName':")
+      println(s"\tService type: $serviceTypeSymbol")
+      println(s"\tService implementation type found: ${defn.symbol}")
 
+      println(s"\tSuper-types (or self):")
       getParentSymbolsOrSelf(defn.symbol).foreach { superTpe =>
-        println(s"\tSuper-type (or self): $superTpe")
+        println(s"\t\t$superTpe")
       }
     }
   }
