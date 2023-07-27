@@ -24,6 +24,8 @@ import scala.meta.inputs.Input
 import scala.reflect.ClassTag
 import scala.util.chaining.scalaUtilChainingOps
 
+import metaconfig.ConfDecoder
+import metaconfig.generic.Surface
 import scalafix.v1._
 
 /**
@@ -36,34 +38,59 @@ import scalafix.v1._
  * @author
  *   Chris de Vreeze
  */
-final class ShowEnterpriseServices extends SemanticRule("ShowEnterpriseServices") {
+final class ShowEnterpriseServices(val config: EnterpriseServiceConfig) extends SemanticRule("ShowEnterpriseServices") {
 
-  private val servletTypeSymbolMatcher: SymbolMatcher = SymbolMatcher.normalized("javax.servlet.http.HttpServlet")
+  private val servletTypeSymbolMatcher: SymbolMatcher = SymbolMatcher.exact("javax/servlet/http/HttpServlet#")
 
   override def fix(implicit doc: SemanticDocument): Patch = {
-    val fileName: Path = doc.input.asInstanceOf[Input.VirtualFile].path.pipe(Paths.get(_)).getFileName
+    if (config.isEmpty) {
+      println(
+        "Missing serviceTypeSymbols (symbols of service types, such as Kafka consumer, Thrift services, etc.). Doing nothing."
+      )
+      Patch.empty
+    } else {
+      // Replacing ".." in HOCON by "#"
+      val serviceTypeSymbols: Seq[Symbol] =
+        config.serviceTypeSymbols.ensuring(_.nonEmpty).map(_.replace("..", "#")).map(Symbol.apply)
 
-    showServletTypes(fileName)
+      serviceTypeSymbols.foreach(checkClassSymbol)
 
-    Patch.empty
+      val fileName: Path = doc.input.asInstanceOf[Input.VirtualFile].path.pipe(Paths.get(_)).getFileName
+
+      showServletTypes(fileName)
+
+      serviceTypeSymbols.foreach { serviceTpe =>
+        val symbolMatcher = SymbolMatcher.exact(serviceTpe.toString)
+
+        showServiceTypes(symbolMatcher, fileName)(doc)
+      }
+
+      Patch.empty
+    }
   }
 
-  private def showServletTypes(fileName: Path)(implicit doc: SemanticDocument): Unit = {
+  private def showServiceTypes(serviceTypeSymbolMatcher: SymbolMatcher, fileName: Path)(implicit
+      doc: SemanticDocument
+  ): Unit = {
     val defns: Seq[Defn.Class] = filterDescendantsOrSelf[Defn.Class](
       doc.tree,
       t =>
         getParentSymbolsOrSelf(t.symbol).exists { pt =>
-          servletTypeSymbolMatcher.matches(pt)
+          serviceTypeSymbolMatcher.matches(pt)
         } && !t.mods.exists(isAbstract)
     )
 
     defns.foreach { defn =>
-      println(s"In file '$fileName' servlet class '${defn.symbol}' found")
+      println(s"In file '$fileName' '${defn.symbol.displayName}' service class '${defn.symbol}' found")
 
       getParentSymbolsOrSelf(defn.symbol).foreach { superTpe =>
         println(s"\tSuper-type (or self): $superTpe")
       }
     }
+  }
+
+  private def showServletTypes(fileName: Path)(implicit doc: SemanticDocument): Unit = {
+    showServiceTypes(servletTypeSymbolMatcher, fileName)(doc)
   }
 
   // See https://github.com/scalameta/scalameta/issues/467
@@ -92,6 +119,14 @@ final class ShowEnterpriseServices extends SemanticRule("ShowEnterpriseServices"
     }
   }
 
+  private def checkClassSymbol(sym: Symbol)(implicit doc: SemanticDocument): Unit = {
+    require(
+      sym.info.exists(info => info.isClass || info.isTrait || info.isInterface),
+      s"Not a class/trait/interface: $sym"
+    )
+    require(sym.info.exists(_.isPublic), s"Not a public method: $sym")
+  }
+
   // Tree navigation support
 
   private def filterDescendantsOrSelf[A <: Tree: ClassTag](tree: Tree, p: A => Boolean): List[A] = {
@@ -100,4 +135,14 @@ final class ShowEnterpriseServices extends SemanticRule("ShowEnterpriseServices"
     tree.children.flatMap(ch => filterDescendantsOrSelf[A](ch, p)).prependedAll(optSelf)
   }
 
+}
+
+final case class EnterpriseServiceConfig(serviceTypeSymbols: List[String] = Nil) {
+  def isEmpty: Boolean = serviceTypeSymbols.isEmpty
+}
+
+object EnterpriseServiceConfig {
+  val default: EnterpriseServiceConfig = EnterpriseServiceConfig()
+  implicit val surface: Surface[EnterpriseServiceConfig] = metaconfig.generic.deriveSurface[EnterpriseServiceConfig]
+  implicit val decoder: ConfDecoder[EnterpriseServiceConfig] = metaconfig.generic.deriveDecoder(default)
 }
