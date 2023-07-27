@@ -124,7 +124,7 @@ final class ShowEnterpriseServices(val config: EnterpriseServiceConfig) extends 
       sym.info.exists(info => info.isClass || info.isTrait || info.isInterface),
       s"Not a class/trait/interface: $sym"
     )
-    require(sym.info.exists(_.isPublic), s"Not a public method: $sym")
+    require(sym.info.exists(_.isPublic), s"Not a public class/trait/interface: $sym")
   }
 
   // Tree navigation support
