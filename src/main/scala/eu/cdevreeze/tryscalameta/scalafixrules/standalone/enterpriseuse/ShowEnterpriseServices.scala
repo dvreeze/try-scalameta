@@ -25,6 +25,7 @@ import scala.reflect.ClassTag
 import scala.util.chaining.scalaUtilChainingOps
 
 import metaconfig.ConfDecoder
+import metaconfig.Configured
 import metaconfig.generic.Surface
 import scalafix.v1._
 
@@ -43,6 +44,11 @@ final class ShowEnterpriseServices(val config: EnterpriseServiceConfig) extends 
   private val servletTypeSymbolMatcher: SymbolMatcher = SymbolMatcher.exact("javax/servlet/http/HttpServlet#")
 
   def this() = this(EnterpriseServiceConfig.default)
+
+  override def withConfiguration(config: Configuration): Configured[Rule] =
+    config.conf
+      .getOrElse("ShowEnterpriseServices")(this.config)
+      .map(newConfig => new ShowEnterpriseServices(newConfig))
 
   override def fix(implicit doc: SemanticDocument): Patch = {
     if (config.isEmpty) {
