@@ -63,11 +63,11 @@ final class ShowEnterpriseServices(val config: EnterpriseServiceConfig) extends 
       val fileName: Path = doc.input.asInstanceOf[Input.VirtualFile].path.pipe(Paths.get(_)).getFileName
 
       val matchingServletDefns = collectMatchingDefinitions(ServiceMatcher.default)
-      showServiceTypes(matchingServletDefns, fileName, ServiceMatcher.default.serviceNameinMessage)
+      showServiceTypes(matchingServletDefns, fileName, ServiceMatcher.default.serviceNameInMessage)
 
       serviceMatchers.foreach { serviceMatcher =>
         val matchingDefns = collectMatchingDefinitions(serviceMatcher)
-        showServiceTypes(matchingDefns, fileName, serviceMatcher.serviceNameinMessage)
+        showServiceTypes(matchingDefns, fileName, serviceMatcher.serviceNameInMessage)
       }
 
       Patch.empty
@@ -87,9 +87,7 @@ final class ShowEnterpriseServices(val config: EnterpriseServiceConfig) extends 
       serviceMatcher: ServiceMatcher
   )(implicit doc: SemanticDocument): Seq[Defn] = {
     val serviceTypeSymbolMatcher = serviceMatcher.symbols
-      .map { sym =>
-        SymbolMatcher.exact(sym.toString)
-      }
+      .map(sym => SymbolMatcher.exact(sym.toString))
       .reduce(_ + _)
 
     val classDefns: Seq[Defn.Class] = filterDescendantsOrSelf[Defn.Class](
@@ -204,13 +202,13 @@ object ShowEnterpriseServices {
 
   sealed trait ServiceMatcher {
     def symbols: Seq[Symbol]
-    def serviceNameinMessage: String
+    def serviceNameInMessage: String
   }
 
   object ServiceMatcher {
 
     // Mstching on at least one of the given super-types
-    final case class ServiceMatcherOnSuperType(symbols: Seq[Symbol], serviceNameinMessage: String)
+    final case class ServiceMatcherOnSuperType(symbols: Seq[Symbol], serviceNameInMessage: String)
         extends ServiceMatcher
 
     def fromConfigEntry(configEntry: EnterpriseServiceConfigEntry)(implicit doc: SemanticDocument): ServiceMatcher = {
@@ -226,7 +224,7 @@ object ShowEnterpriseServices {
             symbolString.replace("..", "#").pipe(Symbol.apply)
           }
           symbols.foreach(checkClassSymbol)
-          ServiceMatcherOnSuperType(symbols, configEntry.serviceNameinMessage)
+          ServiceMatcherOnSuperType(symbols, configEntry.serviceNameInMessage)
         case _ =>
           sys.error(s"Unknown config entry type: '${configEntry.typeOfEntry}'")
       }
@@ -239,7 +237,7 @@ object ShowEnterpriseServices {
 
 }
 
-final case class EnterpriseServiceConfigEntry(typeOfEntry: String, symbols: List[String], serviceNameinMessage: String)
+final case class EnterpriseServiceConfigEntry(typeOfEntry: String, symbols: List[String], serviceNameInMessage: String)
 
 object EnterpriseServiceConfigEntry {
   val knownEntryTypes: Set[String] = Set("HasSuperType") // Poor man's enumeration (limitation of metaconfig)
