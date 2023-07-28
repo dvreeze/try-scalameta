@@ -22,6 +22,7 @@ import java.nio.file.Paths
 import scala.meta._
 import scala.meta.inputs.Input
 import scala.reflect.ClassTag
+import scala.util.Try
 import scala.util.chaining.scalaUtilChainingOps
 
 import metaconfig.ConfDecoder
@@ -60,7 +61,7 @@ final class ShowEnterpriseServices(val config: EnterpriseServiceConfig) extends 
       Patch.empty
     } else {
       val serviceDefinitionCollectors: Seq[ServiceDefinitionCollector] =
-        config.entries.map(entry => ServiceDefinitionCollector.fromConfigEntry(entry))
+        config.entries.flatMap(entry => ServiceDefinitionCollector.tryFromConfigEntry(entry).toOption)
 
       val fileName: Path = doc.input.asInstanceOf[Input.VirtualFile].path.pipe(Paths.get(_)).getFileName
 
@@ -238,9 +239,9 @@ object ShowEnterpriseServices {
 
     }
 
-    def fromConfigEntry(
+    def tryFromConfigEntry(
         configEntry: EnterpriseServiceConfigEntry
-    )(implicit doc: SemanticDocument): ServiceDefinitionCollector = {
+    )(implicit doc: SemanticDocument): Try[ServiceDefinitionCollector] = {
       require(
         EnterpriseServiceConfigEntry.knownEntryTypes.contains(configEntry.typeOfEntry),
         s"Unknown config entry type: '${configEntry.typeOfEntry}'"
@@ -251,16 +252,21 @@ object ShowEnterpriseServices {
         symbolString.replace("..", "#").pipe(Symbol.apply)
       }
 
+      // Checks below may fail if the symbol is unknown due to it not being on the classpath
+
       configEntry.typeOfEntry match {
         case "HasSuperType" =>
-          symbols.foreach(checkClassSymbol)
-          new ServiceDefinitionCollectorBasedOnSuperType(symbols, configEntry.serviceDisplayName)
+          Try(symbols.foreach(checkClassSymbol)).flatMap { _ =>
+            Try(new ServiceDefinitionCollectorBasedOnSuperType(symbols, configEntry.serviceDisplayName))
+          }
         case "UsesType" =>
-          symbols.foreach(checkClassSymbol)
-          new ServiceDefinitionCollectorBasedOnUsedType(symbols, configEntry.serviceDisplayName)
+          Try(symbols.foreach(checkClassSymbol)).flatMap { _ =>
+            Try(new ServiceDefinitionCollectorBasedOnUsedType(symbols, configEntry.serviceDisplayName))
+          }
         case "UsesMethod" =>
-          symbols.foreach(checkMethodSymbol)
-          new ServiceDefinitionCollectorBasedOnUsedMethod(symbols, configEntry.serviceDisplayName)
+          Try(symbols.foreach(checkMethodSymbol)).flatMap { _ =>
+            Try(new ServiceDefinitionCollectorBasedOnUsedMethod(symbols, configEntry.serviceDisplayName))
+          }
         case _ =>
           sys.error(s"Unknown config entry type: '${configEntry.typeOfEntry}'")
       }
