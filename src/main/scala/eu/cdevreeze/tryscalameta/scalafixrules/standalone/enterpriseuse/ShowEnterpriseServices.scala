@@ -24,6 +24,8 @@ import scala.meta.inputs.Input
 import scala.reflect.ClassTag
 import scala.util.chaining.scalaUtilChainingOps
 
+import eu.cdevreeze.tryscalameta.scalafixrules.standalone.enterpriseuse.ShowEnterpriseServices.ServiceMatcher
+import eu.cdevreeze.tryscalameta.scalafixrules.standalone.enterpriseuse.ShowEnterpriseServices.ServiceMatcher.ServiceMatcherOnSuperType
 import metaconfig.ConfDecoder
 import metaconfig.Configured
 import metaconfig.generic.Surface
@@ -42,8 +44,6 @@ import scalafix.v1._
  */
 final class ShowEnterpriseServices(val config: EnterpriseServiceConfig) extends SemanticRule("ShowEnterpriseServices") {
 
-  private val servletTypeSymbol: Symbol = Symbol("javax/servlet/http/HttpServlet#")
-
   def this() = this(EnterpriseServiceConfig.default)
 
   override def withConfiguration(config: Configuration): Configured[Rule] =
@@ -54,32 +54,43 @@ final class ShowEnterpriseServices(val config: EnterpriseServiceConfig) extends 
   override def fix(implicit doc: SemanticDocument): Patch = {
     if (config.isEmpty) {
       println(
-        "Missing serviceTypeSymbols (symbols of service types, such as Kafka consumer, Thrift services, etc.). Doing nothing."
+        "Missing \"enterprise service matchers\". Doing nothing."
       )
       Patch.empty
     } else {
-      // Replacing ".." in HOCON by "#"
-      val serviceTypeSymbols: Seq[Symbol] =
-        config.serviceTypeSymbols.ensuring(_.nonEmpty).map(_.replace("..", "#")).map(Symbol.apply)
-
-      serviceTypeSymbols.foreach(checkClassSymbol)
+      val serviceMatchers: Seq[ServiceMatcher] = config.entries.map(entry => ServiceMatcher.fromConfigEntry(entry))
 
       val fileName: Path = doc.input.asInstanceOf[Input.VirtualFile].path.pipe(Paths.get(_)).getFileName
 
-      showServletTypes(fileName)
+      val matchingServletDefns = collectMatchingDefinitions(ServiceMatcher.default)
+      showServiceTypes(matchingServletDefns, fileName, ServiceMatcher.default.serviceNameinMessage)
 
-      serviceTypeSymbols.foreach { serviceTpe =>
-        showServiceTypes(serviceTpe, fileName)(doc)
+      serviceMatchers.foreach { serviceMatcher =>
+        val matchingDefns = collectMatchingDefinitions(serviceMatcher)
+        showServiceTypes(matchingDefns, fileName, serviceMatcher.serviceNameinMessage)
       }
 
       Patch.empty
     }
   }
 
-  private def showServiceTypes(serviceTypeSymbol: Symbol, fileName: Path)(implicit
-      doc: SemanticDocument
-  ): Unit = {
-    val serviceTypeSymbolMatcher = SymbolMatcher.exact(serviceTypeSymbol.toString)
+  // Collecting matching class/object definitions
+
+  private def collectMatchingDefinitions(serviceMatcher: ServiceMatcher)(implicit doc: SemanticDocument): Seq[Defn] = {
+    serviceMatcher match {
+      case ServiceMatcherOnSuperType(_, _) =>
+        collectMatchingDefinitionsMatchingOnSuperType(serviceMatcher)
+    }
+  }
+
+  private def collectMatchingDefinitionsMatchingOnSuperType(
+      serviceMatcher: ServiceMatcher
+  )(implicit doc: SemanticDocument): Seq[Defn] = {
+    val serviceTypeSymbolMatcher = serviceMatcher.symbols
+      .map { sym =>
+        SymbolMatcher.exact(sym.toString)
+      }
+      .reduce(_ + _)
 
     val classDefns: Seq[Defn.Class] = filterDescendantsOrSelf[Defn.Class](
       doc.tree,
@@ -97,10 +108,18 @@ final class ShowEnterpriseServices(val config: EnterpriseServiceConfig) extends 
         } && !t.mods.exists(isAbstract)
     )
 
-    classDefns.appendedAll(objectDefns).foreach { defn =>
+    classDefns.appendedAll(objectDefns)
+  }
+
+  // Showing the found definitions of "service types"
+
+  private def showServiceTypes(definitions: Seq[Defn], fileName: Path, serviceNameInMessage: String)(implicit
+      doc: SemanticDocument
+  ): Unit = {
+    definitions.foreach { defn =>
       println()
       println(s"Service implementation found in file '$fileName':")
-      println(s"\tService type: $serviceTypeSymbol")
+      println(s"\tService type: $serviceNameInMessage")
       println(s"\tService implementation type found: ${defn.symbol}")
 
       println(s"\tSuper-types (or self):")
@@ -123,9 +142,7 @@ final class ShowEnterpriseServices(val config: EnterpriseServiceConfig) extends 
     }
   }
 
-  private def showServletTypes(fileName: Path)(implicit doc: SemanticDocument): Unit = {
-    showServiceTypes(servletTypeSymbol, fileName)(doc)
-  }
+  // Helper methods
 
   // See https://github.com/scalameta/scalameta/issues/467
   private def isAbstract(mod: Mod): Boolean = mod match {
@@ -153,14 +170,6 @@ final class ShowEnterpriseServices(val config: EnterpriseServiceConfig) extends 
     }
   }
 
-  private def checkClassSymbol(sym: Symbol)(implicit doc: SemanticDocument): Unit = {
-    require(
-      sym.info.exists(info => info.isClass || info.isTrait || info.isInterface),
-      s"Not a class/trait/interface: $sym"
-    )
-    require(sym.info.exists(_.isPublic), s"Not a public class/trait/interface: $sym")
-  }
-
   private def getDeclaredMethodsOfClass(classSym: Symbol)(implicit doc: SemanticDocument): Seq[SymbolInformation] = {
     for {
       classSignature <- classSym.info.map(_.signature).toSeq.collect { case signature: ClassSignature => signature }
@@ -181,8 +190,72 @@ final class ShowEnterpriseServices(val config: EnterpriseServiceConfig) extends 
 
 }
 
-final case class EnterpriseServiceConfig(serviceTypeSymbols: List[String] = Nil) {
-  def isEmpty: Boolean = serviceTypeSymbols.isEmpty
+object ShowEnterpriseServices {
+
+  private val servletTypeSymbol: Symbol = Symbol("javax/servlet/http/HttpServlet#")
+
+  private def checkClassSymbol(sym: Symbol)(implicit doc: SemanticDocument): Unit = {
+    require(
+      sym.info.exists(info => info.isClass || info.isTrait || info.isInterface),
+      s"Not a class/trait/interface: $sym"
+    )
+    require(sym.info.exists(_.isPublic), s"Not a public class/trait/interface: $sym")
+  }
+
+  sealed trait ServiceMatcher {
+    def symbols: Seq[Symbol]
+    def serviceNameinMessage: String
+  }
+
+  object ServiceMatcher {
+
+    // Mstching on at least one of the given super-types
+    final case class ServiceMatcherOnSuperType(symbols: Seq[Symbol], serviceNameinMessage: String)
+        extends ServiceMatcher
+
+    def fromConfigEntry(configEntry: EnterpriseServiceConfigEntry)(implicit doc: SemanticDocument): ServiceMatcher = {
+      require(
+        EnterpriseServiceConfigEntry.knownEntryTypes.contains(configEntry.typeOfEntry),
+        s"Unknown config entry type: '${configEntry.typeOfEntry}'"
+      )
+
+      configEntry.typeOfEntry match {
+        case "HasSuperType" =>
+          val symbols: Seq[Symbol] = configEntry.symbols.ensuring(_.nonEmpty).map { symbolString =>
+            // Replacing ".." in HOCON by "#"
+            symbolString.replace("..", "#").pipe(Symbol.apply)
+          }
+          symbols.foreach(checkClassSymbol)
+          ServiceMatcherOnSuperType(symbols, configEntry.serviceNameinMessage)
+        case _ =>
+          sys.error(s"Unknown config entry type: '${configEntry.typeOfEntry}'")
+      }
+    }
+
+    val default: ServiceMatcherOnSuperType =
+      ServiceMatcherOnSuperType(List(servletTypeSymbol), "Servlet")
+
+  }
+
+}
+
+final case class EnterpriseServiceConfigEntry(typeOfEntry: String, symbols: List[String], serviceNameinMessage: String)
+
+object EnterpriseServiceConfigEntry {
+  val knownEntryTypes: Set[String] = Set("HasSuperType") // Poor man's enumeration (limitation of metaconfig)
+
+  // Mind the two dots below, that must be replaced to get the symbol
+  val default: EnterpriseServiceConfigEntry =
+    EnterpriseServiceConfigEntry("HasSuperType", List("javax/servlet/http/HttpServlet.."), "Servlet")
+
+  implicit val surface: Surface[EnterpriseServiceConfigEntry] =
+    metaconfig.generic.deriveSurface[EnterpriseServiceConfigEntry]
+
+  implicit val decoder: ConfDecoder[EnterpriseServiceConfigEntry] = metaconfig.generic.deriveDecoder(default)
+}
+
+final case class EnterpriseServiceConfig(entries: List[EnterpriseServiceConfigEntry] = Nil) {
+  def isEmpty: Boolean = entries.isEmpty
 }
 
 object EnterpriseServiceConfig {
