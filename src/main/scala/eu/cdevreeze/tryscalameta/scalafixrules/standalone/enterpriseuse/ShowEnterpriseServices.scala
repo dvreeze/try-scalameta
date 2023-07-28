@@ -199,7 +199,7 @@ object ShowEnterpriseServices {
               t,
               anc => (anc.isInstanceOf[Defn.Class] || anc.isInstanceOf[Defn.Object]) && !anc.mods.exists(isAbstract)
             )
-          }
+          }.distinct
 
         classOrObjectDefns
       }
@@ -231,7 +231,7 @@ object ShowEnterpriseServices {
               t,
               anc => (anc.isInstanceOf[Defn.Class] || anc.isInstanceOf[Defn.Object]) && !anc.mods.exists(isAbstract)
             )
-          }
+          }.distinct
 
         classOrObjectDefns
       }
