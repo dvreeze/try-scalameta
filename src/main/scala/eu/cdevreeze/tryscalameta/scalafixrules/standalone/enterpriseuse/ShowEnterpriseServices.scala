@@ -239,6 +239,42 @@ object ShowEnterpriseServices {
 
     }
 
+    /**
+     * Service definition collector matching on at least of the given types or one of their sub-types as used type
+     */
+    final class ServiceDefinitionCollectorBasedOnUsedTypeOrSubType(
+        val symbols: Seq[Symbol],
+        val serviceDisplayName: String
+    ) extends ServiceDefinitionCollector {
+
+      override def collectServiceDefinitions(doc: SemanticDocument): Seq[Defn] = {
+        implicit val semanticDoc: SemanticDocument = doc
+
+        val symbolMatcher = this.toSymbolMatcher
+
+        val matchingTerms: Seq[Term] = filterDescendants[Term](
+          doc.tree,
+          { t =>
+            // Matching terms (matching the term's symbol owner) must be found within a function, and not within
+            // imports or as a package, for example
+            getParentSymbolsOrSelf(t.symbol.owner)
+              .exists(pt => symbolMatcher.matches(pt)) && findFirstAncestor[Defn.Def](t, _ => true).nonEmpty
+          }
+        )
+
+        val classOrObjectDefns: Seq[Defn] =
+          matchingTerms.flatMap { t =>
+            findFirstAncestor[Defn with Stat.WithMods](
+              t,
+              anc => (anc.isInstanceOf[Defn.Class] || anc.isInstanceOf[Defn.Object]) && !anc.mods.exists(isAbstract)
+            )
+          }.distinct
+
+        classOrObjectDefns
+      }
+
+    }
+
     def tryFromConfigEntry(
         configEntry: EnterpriseServiceConfigEntry
     )(implicit doc: SemanticDocument): Try[ServiceDefinitionCollector] = {
@@ -266,6 +302,10 @@ object ShowEnterpriseServices {
         case "UsesMethod" =>
           Try(symbols.foreach(checkMethodSymbol)).flatMap { _ =>
             Try(new ServiceDefinitionCollectorBasedOnUsedMethod(symbols, configEntry.serviceDisplayName))
+          }
+        case "UsesTypeOrSubType" =>
+          Try(symbols.foreach(checkClassSymbol)).flatMap { _ =>
+            Try(new ServiceDefinitionCollectorBasedOnUsedTypeOrSubType(symbols, configEntry.serviceDisplayName))
           }
         case _ =>
           sys.error(s"Unknown config entry type: '${configEntry.typeOfEntry}'")
@@ -363,7 +403,12 @@ final case class EnterpriseServiceConfigEntry(typeOfEntry: String, symbols: List
 object EnterpriseServiceConfigEntry {
 
   val knownEntryTypes: Set[String] =
-    Set("HasSuperType", "UsesType", "UsesMethod") // Poor man's enumeration (limitation of metaconfig)
+    Set(
+      "HasSuperType",
+      "UsesType",
+      "UsesMethod",
+      "UsesTypeOrSubType"
+    ) // Poor man's enumeration (limitation of metaconfig)
 
   // Mind the two dots below, that must be replaced to get the symbol
   val default: EnterpriseServiceConfigEntry =
