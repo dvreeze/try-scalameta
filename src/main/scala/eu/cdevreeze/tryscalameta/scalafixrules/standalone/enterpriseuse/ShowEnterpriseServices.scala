@@ -252,13 +252,20 @@ object ShowEnterpriseServices {
 
         val symbolMatcher = this.toSymbolMatcher
 
+        // For performance
+
+        val matchingSymbolOwners: Set[Symbol] =
+          filterDescendants[Term](doc.tree, _.symbol.info.exists(s => s.isDef || s.isMethod))
+            .map(_.symbol.owner)
+            .toSet
+            .filter(so => getParentSymbolsOrSelf(so).exists(ps => symbolMatcher.matches(ps)))
+
         val matchingTerms: Seq[Term] = filterDescendants[Term](
           doc.tree,
           { t =>
             // Matching terms (matching the term's symbol owner) must be found within a function, and not within
             // imports or as a package, for example
-            getParentSymbolsOrSelf(t.symbol.owner)
-              .exists(pt => symbolMatcher.matches(pt)) && findFirstAncestor[Defn.Def](t, _ => true).nonEmpty
+            matchingSymbolOwners.contains(t.symbol.owner) && findFirstAncestor[Defn.Def](t, _ => true).nonEmpty
           }
         )
 
