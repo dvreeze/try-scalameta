@@ -100,8 +100,10 @@ final class ShowEnterpriseServices(val config: EnterpriseServiceConfig) extends 
       }
 
       getOptionalPrimaryConstructor(defn.symbol).foreach { primaryConstructor =>
-        println(s"\tPrimary constructor:")
-        println(s"\t\t$primaryConstructor")
+        println(s"\tPrimary constructor arguments (across parameter lists):")
+        primaryConstructor.parameterLists.flatten.foreach { par =>
+          println(s"\t\tArgument type: ${par.symbol}")
+        }
       }
 
       println(s"\tProtected concrete declared methods:")
