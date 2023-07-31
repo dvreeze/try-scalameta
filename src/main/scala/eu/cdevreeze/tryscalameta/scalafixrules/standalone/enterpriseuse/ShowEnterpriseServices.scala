@@ -96,8 +96,16 @@ final class ShowEnterpriseServices(val config: EnterpriseServiceConfig) extends 
 
       getOptionalPrimaryConstructor(defn.symbol).foreach { primaryConstructor =>
         println(s"\tPrimary constructor parameters (across parameter lists):")
+
         primaryConstructor.parameterLists.flatten.foreach { par =>
           println(s"\t\tConstructor parameter: ${par.symbol}")
+
+          val parTypeOption: Option[Symbol] = Option(par.signature).collect { case ValueSignature(TypeRef(_, sym, _)) =>
+            sym
+          }
+          parTypeOption.foreach { parType =>
+            println(s"\t\t\tParameter type (raw): $parType")
+          }
         }
       }
 
