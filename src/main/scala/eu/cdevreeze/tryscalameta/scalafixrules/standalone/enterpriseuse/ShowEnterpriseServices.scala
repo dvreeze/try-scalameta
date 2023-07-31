@@ -94,16 +94,16 @@ final class ShowEnterpriseServices(val config: EnterpriseServiceConfig) extends 
         println(s"\t\t$superTpe")
       }
 
-      println(s"\tPublic concrete declared methods:")
-      getDeclaredMethodsOfClass(defn.symbol).filter(_.isPublic).filter(!_.isAbstract).foreach { method =>
-        println(s"\t\t${method.symbol}")
-      }
-
       getOptionalPrimaryConstructor(defn.symbol).foreach { primaryConstructor =>
-        println(s"\tPrimary constructor arguments (across parameter lists):")
+        println(s"\tPrimary constructor parameters (across parameter lists):")
         primaryConstructor.parameterLists.flatten.foreach { par =>
           println(s"\t\tConstructor parameter: ${par.symbol}")
         }
+      }
+
+      println(s"\tPublic concrete declared methods:")
+      getDeclaredMethodsOfClass(defn.symbol).filter(_.isPublic).filter(!_.isAbstract).foreach { method =>
+        println(s"\t\t${method.symbol}")
       }
 
       println(s"\tProtected concrete declared methods:")
