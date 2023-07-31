@@ -45,6 +45,7 @@ final class ShowEnterpriseServices(val config: EnterpriseServiceConfig) extends 
 
   import ShowEnterpriseServices.ServiceDefinitionCollector
   import ShowEnterpriseServices.getDeclaredMethodsOfClass
+  import ShowEnterpriseServices.getOptionalPrimaryConstructor
   import ShowEnterpriseServices.getParentSymbolsOrSelf
 
   def this() = this(EnterpriseServiceConfig.default)
@@ -96,6 +97,11 @@ final class ShowEnterpriseServices(val config: EnterpriseServiceConfig) extends 
       println(s"\tPublic concrete declared methods:")
       getDeclaredMethodsOfClass(defn.symbol).filter(_.isPublic).filter(!_.isAbstract).foreach { method =>
         println(s"\t\t${method.symbol}")
+      }
+
+      getOptionalPrimaryConstructor(defn.symbol).foreach { primaryConstructor =>
+        println(s"\tPrimary constructor:")
+        println(s"\t\t$primaryConstructor")
       }
 
       println(s"\tProtected concrete declared methods:")
@@ -366,6 +372,19 @@ object ShowEnterpriseServices {
           case _ => List(symbol)
         }
     }
+  }
+
+  private def getOptionalPrimaryConstructor(
+      classSym: Symbol
+  )(implicit doc: SemanticDocument): Option[MethodSignature] = {
+    (for {
+      classSignature <- classSym.info.map(_.signature).toSeq.collect { case signature: ClassSignature => signature }
+      decl <- classSignature.declarations
+      if decl.isPrimary
+      constructorSignature <- Seq(decl.signature).collect { case signature: MethodSignature => signature }
+    } yield {
+      constructorSignature
+    }).headOption
   }
 
   private def getDeclaredMethodsOfClass(classSym: Symbol)(implicit doc: SemanticDocument): Seq[SymbolInformation] = {
