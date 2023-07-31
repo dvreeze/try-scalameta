@@ -21,6 +21,7 @@ import java.nio.file.Paths
 
 import scala.meta.Tree
 import scala.meta.inputs.Input
+import scala.reflect.ClassTag
 import scala.util.chaining.scalaUtilChainingOps
 
 import scalafix.XtensionScalafixProductInspect
@@ -50,7 +51,7 @@ final class ShowTreeWithSymbols extends SemanticRule("ShowTree") {
     println("Symbols:")
     println()
 
-    val trees: Seq[Tree] = doc.tree.collect { case node: Tree => node }
+    val trees: Seq[Tree] = findAllDescendantsOrSelf[Tree](doc.tree)
 
     trees.foreach { tree =>
       val symbol: Symbol = tree.symbol
@@ -85,5 +86,16 @@ final class ShowTreeWithSymbols extends SemanticRule("ShowTree") {
         }
     }
   }
+
+  // Tree navigation support
+
+  private def filterDescendantsOrSelf[A <: Tree: ClassTag](tree: Tree, p: A => Boolean): List[A] = {
+    val optSelf: List[A] = List(tree).collect { case t: A if p(t) => t }
+    // Recursive
+    tree.children.flatMap(ch => filterDescendantsOrSelf[A](ch, p)).prependedAll(optSelf)
+  }
+
+  private def findAllDescendantsOrSelf[A <: Tree: ClassTag](tree: Tree): List[A] =
+    filterDescendantsOrSelf[A](tree, _ => true)
 
 }
