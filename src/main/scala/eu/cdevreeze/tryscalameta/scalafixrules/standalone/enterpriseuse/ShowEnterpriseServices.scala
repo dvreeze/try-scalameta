@@ -169,7 +169,7 @@ object ShowEnterpriseServices {
   object ServiceDefinitionCollector {
 
     /**
-     * Service definition collector matching on at least of the given super-types
+     * Service definition collector matching on at least one of the given super-types
      */
     final class ServiceDefinitionCollectorBasedOnSuperType(val symbols: Seq[Symbol], val serviceDisplayName: String)
         extends ServiceDefinitionCollector {
@@ -201,7 +201,7 @@ object ShowEnterpriseServices {
     }
 
     /**
-     * Service definition collector matching on at least of the given exact types as used type
+     * Service definition collector matching on at least one of the given exact types as used type
      */
     final class ServiceDefinitionCollectorBasedOnUsedType(val symbols: Seq[Symbol], val serviceDisplayName: String)
         extends ServiceDefinitionCollector {
@@ -234,7 +234,7 @@ object ShowEnterpriseServices {
     }
 
     /**
-     * Service definition collector matching on at least of the given exact methods as used methods
+     * Service definition collector matching on at least one of the given exact methods as used methods
      */
     final class ServiceDefinitionCollectorBasedOnUsedMethod(val symbols: Seq[Symbol], val serviceDisplayName: String)
         extends ServiceDefinitionCollector {
@@ -266,7 +266,7 @@ object ShowEnterpriseServices {
     }
 
     /**
-     * Service definition collector matching on at least of the given types or one of their sub-types as used type
+     * Service definition collector matching on at least one of the given types or one of their sub-types as used type
      */
     final class ServiceDefinitionCollectorBasedOnUsedTypeOrSubType(
         val symbols: Seq[Symbol],
@@ -308,6 +308,49 @@ object ShowEnterpriseServices {
 
     }
 
+    /**
+     * Service definition collector matching on at least one of the given exact types as used annotation type
+     */
+    final class ServiceDefinitionCollectorBasedOnUsedAnnotation(
+        val symbols: Seq[Symbol],
+        val serviceDisplayName: String
+    ) extends ServiceDefinitionCollector {
+
+      override def collectServiceDefinitions(doc: SemanticDocument): Seq[DefinitionResult] = {
+        implicit val semanticDoc: SemanticDocument = doc
+
+        val symbolMatcher = this.toSymbolMatcher
+
+        val matchingDefns: Seq[Defn with Stat.WithMods] = filterDescendants[Defn with Stat.WithMods](
+          doc.tree,
+          { t =>
+            t.mods.exists(mod => isAnnot(mod, symbolMatcher))
+          }
+        )
+
+        val matchingDecls: Seq[Decl with Stat.WithMods] = filterDescendants[Decl with Stat.WithMods](
+          doc.tree,
+          { t =>
+            t.mods.exists(mod => isAnnot(mod, symbolMatcher))
+          }
+        )
+
+        val classOrObjectDefns: Seq[Defn] =
+          matchingDefns
+            .appendedAll(matchingDecls)
+            .flatMap { t =>
+              findFirstAncestorOrSelf[Defn with Stat.WithMods](
+                t,
+                anc => (anc.isInstanceOf[Defn.Class] || anc.isInstanceOf[Defn.Object]) && !anc.mods.exists(isAbstract)
+              )
+            }
+            .distinct
+
+        classOrObjectDefns.map(defn => DefinitionResult(defn, serviceDisplayName))
+      }
+
+    }
+
     def tryFromConfigEntry(
         configEntry: EnterpriseServiceConfigEntry
     )(implicit doc: SemanticDocument): Try[ServiceDefinitionCollector] = {
@@ -339,6 +382,10 @@ object ShowEnterpriseServices {
         case "UsesTypeOrSubType" =>
           Try(symbols.foreach(checkClassSymbol)).flatMap { _ =>
             Try(new ServiceDefinitionCollectorBasedOnUsedTypeOrSubType(symbols, configEntry.serviceDisplayName))
+          }
+        case "UsesAnnotation" =>
+          Try(symbols.foreach(checkClassSymbol)).flatMap { _ =>
+            Try(new ServiceDefinitionCollectorBasedOnUsedAnnotation(symbols, configEntry.serviceDisplayName))
           }
         case _ =>
           sys.error(s"Unknown config entry type: '${configEntry.typeOfEntry}'")
@@ -372,6 +419,16 @@ object ShowEnterpriseServices {
   private def isAbstract(mod: Mod): Boolean = mod match {
     case mod"abstract" => true
     case _             => false
+  }
+
+  // See https://github.com/scalameta/scalameta/issues/467
+  private def isAnnot(mod: Mod, symbolMatcher: SymbolMatcher)(implicit doc: SemanticDocument): Boolean = mod match {
+    case mod"@$annot" =>
+      annot match {
+        case Mod.Annot(Init.After_4_6_0(tpe, _, _)) => symbolMatcher.matches(tpe.symbol)
+        case _                                      => false
+      }
+    case _ => false
   }
 
   private def getParentSymbolsOrSelf(symbol: Symbol)(implicit doc: SemanticDocument): List[Symbol] = {
@@ -442,6 +499,9 @@ object ShowEnterpriseServices {
   private def findFirstAncestor[A <: Tree: ClassTag](tree: Tree, p: A => Boolean): Option[A] =
     filterAncestors[A](tree, p).headOption
 
+  private def findFirstAncestorOrSelf[A <: Tree: ClassTag](tree: Tree, p: A => Boolean): Option[A] =
+    filterAncestorsOrSelf[A](tree, p).headOption
+
 }
 
 final case class EnterpriseServiceConfigEntry(typeOfEntry: String, symbols: List[String], serviceDisplayName: String)
@@ -453,7 +513,8 @@ object EnterpriseServiceConfigEntry {
       "HasSuperType",
       "UsesType",
       "UsesMethod",
-      "UsesTypeOrSubType"
+      "UsesTypeOrSubType",
+      "UsesAnnotation"
     ) // Poor man's enumeration (limitation of metaconfig)
 
   // Mind the two dots below, that must be replaced to get the symbol
