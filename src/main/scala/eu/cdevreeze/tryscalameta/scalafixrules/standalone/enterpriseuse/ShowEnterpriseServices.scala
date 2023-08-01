@@ -43,6 +43,7 @@ import scalafix.v1._
  */
 final class ShowEnterpriseServices(val config: EnterpriseServiceConfig) extends SemanticRule("ShowEnterpriseServices") {
 
+  import ShowEnterpriseServices.DefinitionResult
   import ShowEnterpriseServices.ServiceDefinitionCollector
   import ShowEnterpriseServices.getDeclaredMethodsOfClass
   import ShowEnterpriseServices.getOptionalPrimaryConstructor
@@ -66,12 +67,21 @@ final class ShowEnterpriseServices(val config: EnterpriseServiceConfig) extends 
 
       val fileName: Path = doc.input.asInstanceOf[Input.VirtualFile].path.pipe(Paths.get(_)).getFileName
 
-      val matchingServletDefns = ServiceDefinitionCollector.default.collectServiceDefinitions(doc)
-      showServiceTypes(matchingServletDefns, fileName, ServiceDefinitionCollector.default.serviceDisplayName)
+      val matchingServletDefnResults: Seq[DefinitionResult] =
+        ServiceDefinitionCollector.default.collectServiceDefinitions(doc)
 
-      serviceDefinitionCollectors.foreach { serviceDefinitionCollector =>
-        val matchingDefns = serviceDefinitionCollector.collectServiceDefinitions(doc)
-        showServiceTypes(matchingDefns, fileName, serviceDefinitionCollector.serviceDisplayName)
+      val otherMatchingDefnResults: Seq[DefinitionResult] =
+        serviceDefinitionCollectors.flatMap { serviceDefinitionCollector =>
+          serviceDefinitionCollector.collectServiceDefinitions(doc)
+        }
+
+      val allDefnResults: Seq[DefinitionResult] = matchingServletDefnResults.appendedAll(otherMatchingDefnResults)
+
+      val defnResultsBySymbol: Map[String, Seq[DefinitionResult]] =
+        allDefnResults.groupBy(_.defn.symbol.value)
+
+      defnResultsBySymbol.foreach { case (_, defns) =>
+        showServiceTypes(defns.head.defn, fileName, defns.map(_.serviceDisplayName))
       }
 
       Patch.empty
@@ -80,48 +90,46 @@ final class ShowEnterpriseServices(val config: EnterpriseServiceConfig) extends 
 
   // Showing the found definitions of "service types"
 
-  private def showServiceTypes(definitions: Seq[Defn], fileName: Path, serviceDisplayName: String)(implicit
+  private def showServiceTypes(defn: Defn, fileName: Path, serviceDisplayNames: Seq[String])(implicit
       doc: SemanticDocument
   ): Unit = {
-    definitions.foreach { defn =>
-      println()
-      println(s"Service implementation found in file '$fileName':")
-      println(s"\tService type: $serviceDisplayName")
-      println(s"\tService implementation type found: ${defn.symbol}")
+    println()
+    println(s"Service implementation found in file '$fileName':")
+    serviceDisplayNames.foreach(serviceDisplayName => println(s"\tService type: $serviceDisplayName"))
+    println(s"\tService implementation type found: ${defn.symbol}")
 
-      println(s"\tSuper-types (or self):")
-      getParentSymbolsOrSelf(defn.symbol).foreach { superTpe =>
-        println(s"\t\t$superTpe")
-      }
+    println(s"\tSuper-types (or self):")
+    getParentSymbolsOrSelf(defn.symbol).foreach { superTpe =>
+      println(s"\t\t$superTpe")
+    }
 
-      getOptionalPrimaryConstructor(defn.symbol).foreach { primaryConstructor =>
-        println(s"\tPrimary constructor parameters (across parameter lists):")
+    getOptionalPrimaryConstructor(defn.symbol).foreach { primaryConstructor =>
+      println(s"\tPrimary constructor parameters (across parameter lists):")
 
-        primaryConstructor.parameterLists.flatten.foreach { par =>
-          println(s"\t\tConstructor parameter: ${par.symbol}")
+      primaryConstructor.parameterLists.flatten.foreach { par =>
+        println(s"\t\tConstructor parameter: ${par.symbol}")
 
-          val parTypeOption: Option[Symbol] = Option(par.signature).collect { case ValueSignature(TypeRef(_, sym, _)) =>
-            sym
-          }
-          parTypeOption.foreach { parType =>
-            println(s"\t\t\tParameter type (raw): $parType")
-          }
+        val parTypeOption: Option[Symbol] = Option(par.signature).collect { case ValueSignature(TypeRef(_, sym, _)) =>
+          sym
+        }
+        parTypeOption.foreach { parType =>
+          println(s"\t\t\tParameter type (raw): $parType")
         }
       }
+    }
 
-      println(s"\tPublic concrete declared methods:")
-      getDeclaredMethodsOfClass(defn.symbol).filter(_.isPublic).filter(!_.isAbstract).foreach { method =>
+    println(s"\tPublic concrete declared methods:")
+    getDeclaredMethodsOfClass(defn.symbol).filter(_.isPublic).filter(!_.isAbstract).foreach { method =>
+      println(s"\t\t${method.symbol}")
+    }
+
+    println(s"\tProtected concrete declared methods:")
+    getDeclaredMethodsOfClass(defn.symbol)
+      .filter(m => m.isProtected || m.isProtectedThis || m.isProtectedWithin)
+      .filter(!_.isAbstract)
+      .foreach { method =>
         println(s"\t\t${method.symbol}")
       }
-
-      println(s"\tProtected concrete declared methods:")
-      getDeclaredMethodsOfClass(defn.symbol)
-        .filter(m => m.isProtected || m.isProtectedThis || m.isProtectedWithin)
-        .filter(!_.isAbstract)
-        .foreach { method =>
-          println(s"\t\t${method.symbol}")
-        }
-    }
   }
 
 }
@@ -129,6 +137,8 @@ final class ShowEnterpriseServices(val config: EnterpriseServiceConfig) extends 
 object ShowEnterpriseServices {
 
   private val servletTypeSymbol: Symbol = Symbol("javax/servlet/http/HttpServlet#")
+
+  final case class DefinitionResult(defn: Defn, serviceDisplayName: String)
 
   sealed trait ServiceDefinitionCollector {
 
@@ -145,7 +155,7 @@ object ShowEnterpriseServices {
     /**
      * Collects the matching service definitions occurring in the passed semantic document's syntax tree
      */
-    def collectServiceDefinitions(doc: SemanticDocument): Seq[Defn]
+    def collectServiceDefinitions(doc: SemanticDocument): Seq[DefinitionResult]
 
     /**
      * The symbols turned into a SymbolMatcher, used by the implementation of this service definition collector
@@ -164,7 +174,7 @@ object ShowEnterpriseServices {
     final class ServiceDefinitionCollectorBasedOnSuperType(val symbols: Seq[Symbol], val serviceDisplayName: String)
         extends ServiceDefinitionCollector {
 
-      override def collectServiceDefinitions(doc: SemanticDocument): Seq[Defn] = {
+      override def collectServiceDefinitions(doc: SemanticDocument): Seq[DefinitionResult] = {
         implicit val semanticDoc: SemanticDocument = doc
 
         val serviceTypeSymbolMatcher = this.toSymbolMatcher
@@ -185,7 +195,7 @@ object ShowEnterpriseServices {
             } && !t.mods.exists(isAbstract)
         )
 
-        classDefns.appendedAll(objectDefns)
+        classDefns.appendedAll(objectDefns).map(defn => DefinitionResult(defn, serviceDisplayName))
       }
 
     }
@@ -196,7 +206,7 @@ object ShowEnterpriseServices {
     final class ServiceDefinitionCollectorBasedOnUsedType(val symbols: Seq[Symbol], val serviceDisplayName: String)
         extends ServiceDefinitionCollector {
 
-      override def collectServiceDefinitions(doc: SemanticDocument): Seq[Defn] = {
+      override def collectServiceDefinitions(doc: SemanticDocument): Seq[DefinitionResult] = {
         implicit val semanticDoc: SemanticDocument = doc
 
         val symbolMatcher = this.toSymbolMatcher
@@ -218,7 +228,7 @@ object ShowEnterpriseServices {
             )
           }.distinct
 
-        classOrObjectDefns
+        classOrObjectDefns.map(defn => DefinitionResult(defn, serviceDisplayName))
       }
 
     }
@@ -229,7 +239,7 @@ object ShowEnterpriseServices {
     final class ServiceDefinitionCollectorBasedOnUsedMethod(val symbols: Seq[Symbol], val serviceDisplayName: String)
         extends ServiceDefinitionCollector {
 
-      override def collectServiceDefinitions(doc: SemanticDocument): Seq[Defn] = {
+      override def collectServiceDefinitions(doc: SemanticDocument): Seq[DefinitionResult] = {
         implicit val semanticDoc: SemanticDocument = doc
 
         val symbolMatcher = this.toSymbolMatcher
@@ -250,7 +260,7 @@ object ShowEnterpriseServices {
             )
           }.distinct
 
-        classOrObjectDefns
+        classOrObjectDefns.map(defn => DefinitionResult(defn, serviceDisplayName))
       }
 
     }
@@ -263,7 +273,7 @@ object ShowEnterpriseServices {
         val serviceDisplayName: String
     ) extends ServiceDefinitionCollector {
 
-      override def collectServiceDefinitions(doc: SemanticDocument): Seq[Defn] = {
+      override def collectServiceDefinitions(doc: SemanticDocument): Seq[DefinitionResult] = {
         implicit val semanticDoc: SemanticDocument = doc
 
         val symbolMatcher = this.toSymbolMatcher
@@ -293,7 +303,7 @@ object ShowEnterpriseServices {
             )
           }.distinct
 
-        classOrObjectDefns
+        classOrObjectDefns.map(defn => DefinitionResult(defn, serviceDisplayName))
       }
 
     }
