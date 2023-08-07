@@ -44,6 +44,7 @@ import scalafix.v1._
 final class ShowEnterpriseServices(val config: EnterpriseServiceConfig) extends SemanticRule("ShowEnterpriseServices") {
 
   import ShowEnterpriseServices.DefinitionResult
+  import ShowEnterpriseServices.FoundSymbols
   import ShowEnterpriseServices.ServiceDefinitionCollector
   import ShowEnterpriseServices.getDeclaredMethodsOfClass
   import ShowEnterpriseServices.getOptionalPrimaryConstructor
@@ -81,7 +82,9 @@ final class ShowEnterpriseServices(val config: EnterpriseServiceConfig) extends 
         allDefnResults.groupBy(_.defn.symbol.value)
 
       defnResultsBySymbol.foreach { case (_, defns) =>
-        showServiceTypes(defns.head.defn, fileName, defns.map(_.serviceDisplayName))
+        val foundSymbolGroups: Seq[FoundSymbols] = defns.flatMap(_.foundSymbolsOption.toSeq)
+
+        showServiceTypes(defns.head.defn, fileName, defns.map(_.serviceDisplayName), foundSymbolGroups)
       }
 
       Patch.empty
@@ -90,13 +93,23 @@ final class ShowEnterpriseServices(val config: EnterpriseServiceConfig) extends 
 
   // Showing the found definitions of "service types"
 
-  private def showServiceTypes(defn: Defn, fileName: Path, serviceDisplayNames: Seq[String])(implicit
+  private def showServiceTypes(
+      defn: Defn,
+      fileName: Path,
+      serviceDisplayNames: Seq[String],
+      foundSymbolGroups: Seq[FoundSymbols]
+  )(implicit
       doc: SemanticDocument
   ): Unit = {
     println()
     println(s"Service implementation found in file '$fileName':")
     serviceDisplayNames.foreach(serviceDisplayName => println(s"\tService type: $serviceDisplayName"))
     println(s"\tService implementation type found: ${defn.symbol}")
+
+    foundSymbolGroups.foreach { foundSymbols =>
+      println(s"\tFound symbols. Description: ${foundSymbols.description}. Symbols:")
+      foundSymbols.symbols.foreach(sym => println(s"\t\t$sym"))
+    }
 
     println(s"\tSuper-types (or self):")
     getParentSymbolsOrSelf(defn.symbol).foreach { superTpe =>
@@ -138,12 +151,25 @@ object ShowEnterpriseServices {
 
   private val servletTypeSymbol: Symbol = Symbol("javax/servlet/http/HttpServlet#")
 
-  final case class DefinitionResult(defn: Defn, serviceDisplayName: String)
+  final case class FoundSymbols(description: String, symbols: Seq[Symbol]) {
+
+    def plusSymbol(sym: Symbol): FoundSymbols = {
+      if (symbols.contains(sym)) {
+        this
+      } else {
+        FoundSymbols(description, this.symbols.appended(sym))
+      }
+    }
+
+  }
+
+  final case class DefinitionResult(defn: Defn, serviceDisplayName: String, foundSymbolsOption: Option[FoundSymbols])
 
   sealed trait ServiceDefinitionCollector {
 
     /**
-     * The symbols used for matching in the implementation of this service definition collector
+     * The symbols used for matching in the implementation of this service definition collector. Don't confuse these
+     * with found symbols in definition results, which are unrelated.
      */
     def symbols: Seq[Symbol]
 
@@ -195,7 +221,7 @@ object ShowEnterpriseServices {
             } && !t.mods.exists(isAbstract)
         )
 
-        classDefns.appendedAll(objectDefns).map(defn => DefinitionResult(defn, serviceDisplayName))
+        classDefns.appendedAll(objectDefns).map(defn => DefinitionResult(defn, serviceDisplayName, None))
       }
 
     }
@@ -228,7 +254,7 @@ object ShowEnterpriseServices {
             )
           }.distinct
 
-        classOrObjectDefns.map(defn => DefinitionResult(defn, serviceDisplayName))
+        classOrObjectDefns.map(defn => DefinitionResult(defn, serviceDisplayName, None))
       }
 
     }
@@ -260,7 +286,7 @@ object ShowEnterpriseServices {
             )
           }.distinct
 
-        classOrObjectDefns.map(defn => DefinitionResult(defn, serviceDisplayName))
+        classOrObjectDefns.map(defn => DefinitionResult(defn, serviceDisplayName, None))
       }
 
     }
@@ -295,6 +321,11 @@ object ShowEnterpriseServices {
           }
         )
 
+        val foundSymbols: FoundSymbols = FoundSymbols(
+          s"Found used sub-types or self of [ ${symbols.mkString(", ")} ]",
+          matchingTerms.map(_.symbol.owner).distinct
+        )
+
         val classOrObjectDefns: Seq[Defn] =
           matchingTerms.flatMap { t =>
             findFirstAncestor[Defn with Stat.WithMods](
@@ -303,7 +334,7 @@ object ShowEnterpriseServices {
             )
           }.distinct
 
-        classOrObjectDefns.map(defn => DefinitionResult(defn, serviceDisplayName))
+        classOrObjectDefns.map(defn => DefinitionResult(defn, serviceDisplayName, Some(foundSymbols)))
       }
 
     }
@@ -346,7 +377,7 @@ object ShowEnterpriseServices {
             }
             .distinct
 
-        classOrObjectDefns.map(defn => DefinitionResult(defn, serviceDisplayName))
+        classOrObjectDefns.map(defn => DefinitionResult(defn, serviceDisplayName, None))
       }
 
     }
