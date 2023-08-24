@@ -26,7 +26,7 @@ import scala.util.chaining.scalaUtilChainingOps
 import scalafix.v1._
 
 /**
- * Shows usage of Scalatra, in particular servlet implementations, Lifecycle implementations and mount method calls.
+ * Shows usage of Scalatra, in particular servlet implementations, LifeCycle implementations and mount method calls.
  *
  * This "rule" only depends on the Scala standard library and on Scalafix (and therefore Scalameta) and nothing else, so
  * this rule can easily be run from its source path against sbt or Maven projects.
@@ -51,12 +51,12 @@ final class ShowScalatraUsage extends SemanticRule("ShowScalatraUsage") {
       }
     }
 
-    val lifecycleClasses: Seq[Defn] = findLifecycleClasses(doc)
+    val lifecycleClasses: Seq[Defn] = findLifeCycleClasses(doc)
 
     if (lifecycleClasses.nonEmpty) {
       println()
       lifecycleClasses.foreach { cls =>
-        println(s"Found Scalatra Lifecycle implementation '${cls.symbol}'")
+        println(s"Found Scalatra LifeCycle implementation '${cls.symbol}'")
       }
     }
 
@@ -88,8 +88,8 @@ final class ShowScalatraUsage extends SemanticRule("ShowScalatraUsage") {
     getParentSymbolsOrSelf(servletClass.symbol).exists(scalatraHandlerMatcher.matches)
   }
 
-  private def findLifecycleClasses(implicit doc: SemanticDocument): Seq[Defn] = {
-    val lifecycleMatcher: SymbolMatcher = SymbolMatcher.exact("org/scalatra/Lifecycle#")
+  private def findLifeCycleClasses(implicit doc: SemanticDocument): Seq[Defn] = {
+    val lifecycleMatcher: SymbolMatcher = SymbolMatcher.exact("org/scalatra/LifeCycle#")
 
     def isMatch(defn: Defn): Boolean = {
       getParentSymbolsOrSelf(defn.symbol).exists(lifecycleMatcher.matches)
