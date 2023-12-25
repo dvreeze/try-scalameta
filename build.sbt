@@ -1,5 +1,5 @@
 
-val scalaVer = "2.13.11"
+val scalaVer = "2.13.12"
 val crossScalaVer = Seq(scalaVer)
 
 ThisBuild / description  := "Trying out Scalameta"
@@ -35,21 +35,21 @@ ThisBuild / pomIncludeRepository := { _ => false }
 // output (e.g. symbols and types). Artifact org.scalameta::trees, on the other hand, needs no Scala compiler,
 // does not depend on it, and uses its internal FastParse parser combinator to parse Scala sources into syntactic trees (ASTs).
 
-ThisBuild / libraryDependencies += "org.scalameta" %% "scalameta" % "4.8.4"
+ThisBuild / libraryDependencies += "org.scalameta" %% "scalameta" % "4.8.14"
 
-ThisBuild / libraryDependencies += "org.scalameta" % "scalafmt-interfaces" % "3.7.9"
+ThisBuild / libraryDependencies += "org.scalameta" % "scalafmt-interfaces" % "3.7.17"
 
-ThisBuild / libraryDependencies += "org.scalameta" %% "scalafmt-dynamic" % "3.7.9"
+ThisBuild / libraryDependencies += "org.scalameta" %% "scalafmt-dynamic" % "3.7.17"
 
-ThisBuild / libraryDependencies += "ch.epfl.scala" %% "scalafix-rules" % "0.11.0"
+ThisBuild / libraryDependencies += "ch.epfl.scala" %% "scalafix-rules" % "0.11.1"
 
-ThisBuild / libraryDependencies += "ch.epfl.scala" % "scalafix-interfaces" % "0.11.0"
+ThisBuild / libraryDependencies += "ch.epfl.scala" % "scalafix-interfaces" % "0.11.1"
 
 ThisBuild / libraryDependencies += "com.geirsson" %% "metaconfig-typesafe-config" % "0.11.1"
 
 ThisBuild / libraryDependencies += "com.github.scopt" %% "scopt" % "4.1.0"
 
-ThisBuild / libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.16" % Test
+ThisBuild / libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.17" % Test
 
 lazy val root = project.in(file("."))
   .settings(
